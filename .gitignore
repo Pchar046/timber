@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+env
 
 # python
 __pycache__/
@@ -11,6 +12,8 @@ venv/
 
 # local data
 *.db
+*.db-wal
+*.db-shm
 *.sqlite3
 
 # editors / os

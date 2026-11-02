@@ -1,7 +1,6 @@
-"""Muse Image: the Illustrator. ~18 s per image, so pre-generate; never on the live path.
+"""Muse Image: the Illustrator. ~8-18 s per image, so pre-generate; never on the live path.
 
-The model ID is not confirmed yet: check the dev.meta.ai model list and set
-MUSE_IMAGE_MODEL in .env if it differs from the default below.
+Model ID muse-image-1.0 confirmed against the live model list (Nov 2).
 """
 
 import base64

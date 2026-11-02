@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#eef4f0">
+<title>Timber</title>
+<style>
+  :root {
+    --bg: #eef4f0; --card: #ffffff; --ink: #22302a; --muted: #66796f; --line: #d8e3dc;
+    --accent: #3f7d62; --accent-ink: #ffffff;
+    --calm: #d9eee2; --rising: #f4e9cf; --overloaded: #e2dcf1;
+    --banner: #fff6df; --banner-line: #ecd9a6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141a17; --card: #1d2420; --ink: #e3ebe6; --muted: #9aaaa1; --line: #2c3530;
+      --accent: #78b89a; --accent-ink: #0f1512;
+      --calm: #1f3329; --rising: #3a3320; --overloaded: #2c2840;
+      --banner: #322b18; --banner-line: #574a24;
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink); transition: background 1.2s ease;
+    font: 17px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  }
+  body[data-level="calm"] { --tint: var(--calm); }
+  body[data-level="rising"] { --tint: var(--rising); }
+  body[data-level="overloaded"] { --tint: var(--overloaded); }
+  main { max-width: 480px; margin: 0 auto; display: grid; gap: 16px; }
+  header { display: flex; justify-content: space-between; align-items: center; }
+  h1 { font-size: 20px; margin: 0; letter-spacing: .02em; }
+  .conn { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .conn::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #c9a24a; }
+  .conn.on::before { background: var(--accent); }
+
+  .level {
+    background: var(--tint, var(--card)); border-radius: 24px; padding: 28px 20px; text-align: center;
+    transition: background 1.2s ease;
+  }
+  .level .word { font-size: 34px; font-weight: 650; margin: 0; }
+  .level .reason { color: var(--muted); margin: 8px 0 0; font-size: 15px; }
+  .level.pulse { animation: pulse 1.6s ease-in-out 3; }
+  @keyframes pulse { 50% { transform: scale(1.025); box-shadow: 0 0 0 10px color-mix(in srgb, var(--tint) 60%, transparent); } }
+  @media (prefers-reduced-motion: reduce) { .level.pulse { animation: none; outline: 3px solid var(--accent); } }
+
+  .banner {
+    display: none; background: var(--banner); border: 1px solid var(--banner-line); border-radius: 16px;
+    padding: 14px 16px; gap: 12px; align-items: start; justify-content: space-between;
+  }
+  .banner.show { display: flex; }
+  .banner p { margin: 0; }
+  .banner button { background: none; border: 0; color: var(--muted); font: inherit; padding: 0 4px; cursor: pointer; }
+
+  .break {
+    width: 100%; min-height: 120px; border: 0; border-radius: 24px; cursor: pointer;
+    background: var(--accent); color: var(--accent-ink); font: 600 26px/1.2 inherit;
+  }
+  .break:active { transform: scale(.98); }
+  .words {
+    width: 100%; padding: 14px; border-radius: 16px; border: 1px solid var(--line); cursor: pointer;
+    background: var(--card); color: var(--ink); font: inherit;
+  }
+  .words[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+  .note { text-align: center; color: var(--muted); font-size: 14px; min-height: 1.4em; margin: 0; }
+
+  section.log { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; }
+  section.log h2 { font-size: 14px; color: var(--muted); font-weight: 600; margin: 0 0 8px; }
+  section.log ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  section.log li { display: flex; justify-content: space-between; gap: 12px; font-size: 15px; }
+  section.log time { color: var(--muted); font-size: 13px; white-space: nowrap; }
+
+  .start {
+    position: fixed; inset: 0; background: var(--bg); display: grid; place-items: center;
+    text-align: center; padding: 24px; z-index: 10; cursor: pointer;
+  }
+  .start p { color: var(--muted); }
+  .start strong { font-size: 24px; }
+  .start[hidden] { display: none; }
+</style>
+</head>
+<body data-level="calm">
+<div class="start" id="start" role="button" tabindex="0">
+  <div><strong>Tap to start Timber</strong><p>This lets your phone vibrate gently when Timber needs to reach you.</p></div>
+</div>
+
+<main>
+  <header>
+    <h1>Timber</h1>
+    <span class="conn" id="conn">Connecting…</span>
+  </header>
+
+  <div class="banner" id="banner" role="alert">
+    <p id="banner-text"></p>
+    <button id="banner-close" aria-label="Dismiss">✕</button>
+  </div>
+
+  <section class="level" id="level" aria-live="polite">
+    <p class="word" id="level-word">Calm</p>
+    <p class="reason" id="level-reason">Waiting for readings.</p>
+  </section>
+
+  <button class="break" id="break">I need a break</button>
+  <button class="words" id="words" aria-pressed="false">My words are off</button>
+  <p class="note" id="note"></p>
+
+  <section class="log">
+    <h2>What Timber did</h2>
+    <ul id="log"><li><span>Nothing yet.</span></li></ul>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const WORDS = { calm: "Calm", rising: "Getting busy", overloaded: "A lot right now" };
+const VIBRATE = [60, 120, 60];  // gentle: short, soft, short
+let started = false;
+
+// What each decision means, said kindly and in the first person.
+const DID = {
+  vibrate: () => "Gentle vibration",
+  whisper: () => "A calm word",
+  notify_phone: () => "Let you know",
+  notify_circle: (d) => `Told ${(d.data.to || ["your trusted person"]).join(", ")}`,
+  adjust_home: () => "Calmed the room",
+  speak_for_you: (d) => `Spoke for you${d.data.heard ? ` ("${d.data.heard}")` : ""}`,
+  remember: () => "Saved this moment",
+};
+
+// ---------- start (a tap unlocks vibration) ----------
+function start() { started = true; $("start").hidden = true; navigator.vibrate?.(1); }
+$("start").addEventListener("click", start);
+$("start").addEventListener("keydown", (e) => (e.key === "Enter" || e.key === " ") && start());
+
+// ---------- showing state ----------
+function showLevel(sense) {
+  const level = sense?.level || "calm";
+  document.body.dataset.level = level;
+  $("level-word").textContent = WORDS[level];
+  $("level-reason").textContent = sense?.reason || "Waiting for readings.";
+}
+
+function nudge() {
+  if (started && navigator.vibrate && navigator.vibrate(VIBRATE)) return;
+  const card = $("level");  // no vibration (e.g. iPhone): a soft on-screen pulse
+  card.classList.remove("pulse"); void card.offsetWidth; card.classList.add("pulse");
+}
+
+function showBanner(text) {
+  $("banner-text").textContent = text;
+  $("banner").classList.add("show");
+}
+$("banner-close").onclick = () => $("banner").classList.remove("show");
+
+const timeOf = (t) => new Date(t * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+const logItems = [];
+function addLog(d) {
+  const text = (DID[d.action] || (() => d.action))(d);
+  logItems.unshift({ text, t: d.t });
+  logItems.length = Math.min(logItems.length, 6);
+  $("log").replaceChildren(...logItems.map(({ text, t }) => {
+    const li = document.createElement("li");
+    const span = document.createElement("span"); span.textContent = text;
+    const time = document.createElement("time"); time.textContent = timeOf(t);
+    li.append(span, time); return li;
+  }));
+}
+
+function onDecision(d) {
+  addLog(d);
+  if (d.action === "vibrate") nudge();
+  if (d.action === "notify_phone") showBanner("Things are getting a lot. Timber is with you.");
+  if (d.action === "notify_circle") $("note").textContent = `${(d.data.to || []).join(", ")} knows.`;
+  if (d.action === "remember") { $("banner").classList.remove("show"); $("note").textContent = "You're calm again."; }
+}
+
+// ---------- live feed ----------
+let retry = 1000;
+function connect() {
+  const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/person`);
+  ws.onopen = () => { retry = 1000; $("conn").textContent = "Connected"; $("conn").classList.add("on"); };
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.kind === "state") showLevel(msg.sense);
+    if (msg.kind === "decision") onDecision(msg.decision);
+  };
+  ws.onclose = () => {
+    $("conn").textContent = "Reconnecting…"; $("conn").classList.remove("on");
+    setTimeout(connect, retry); retry = Math.min(retry * 2, 10000);
+  };
+}
+connect();
+
+// ---------- buttons ----------
+async function gesture(kind) {
+  const r = await fetch("/api/events", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type: "gesture", source: "phone", data: { kind } }),
+  });
+  if (!r.ok) throw new Error(r.status);
+}
+
+$("break").onclick = async () => {
+  try { await gesture("break"); $("note").textContent = "Timber knows. Take your time."; }
+  catch { $("note").textContent = "Couldn't reach Timber. Try again."; }
+};
+
+$("words").onclick = async () => {
+  const off = $("words").getAttribute("aria-pressed") !== "true";
+  try {
+    await gesture(off ? "speech_off" : "speech_on");
+    $("words").setAttribute("aria-pressed", String(off));
+    $("words").textContent = off ? "My words are off · Timber will speak for me" : "My words are off";
+  } catch { $("note").textContent = "Couldn't reach Timber. Try again."; }
+};
+</script>
+</body>
+</html>

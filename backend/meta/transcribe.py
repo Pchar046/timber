@@ -86,8 +86,14 @@ class TranscribeSession:
 
     async def send_audio(self, pcm: bytes) -> None:
         if self._ws is not None:
-            await self._ws.send(pcm)
-        elif self._demo is None:
+            try:
+                await self._ws.send(pcm)
+                return
+            except Exception as exc:  # Meta closed the stream: log it, fall back to demo
+                self.status = "error"
+                self._error = self._error or f"{type(exc).__name__}: {exc}"[:300]
+                await self._close_ws()
+        if self._demo is None:
             self._demo = asyncio.create_task(self._play_demo())
 
     async def close(self) -> None:
@@ -143,5 +149,5 @@ async def transcribe_pcm(pcm: bytes, task: str = "transcribe clip", realtime: bo
             if realtime:
                 await asyncio.sleep(0.1)
 
-    texts = [e.get("text") or e.get("transcript") for e in events if e.get("type") == "transcript"]
+    texts = [(e.get("text") or e.get("transcript") or "").strip() for e in events if e.get("type") == "transcript"]
     return {"text": next((t for t in reversed(texts) if t), ""), "events": events, "_status": session.status}

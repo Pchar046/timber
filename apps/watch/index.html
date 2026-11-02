@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timber · Device test</title>
+<style>
+  :root { --bg: #f4f7f5; --card: #fff; --ink: #24332c; --muted: #6b7f75; --accent: #4a8c6f; --line: #dbe5df; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--ink); font: 16px/1.4 system-ui, sans-serif; }
+  main { max-width: 560px; margin: 0 auto; display: grid; gap: 16px; }
+  h1 { font-size: 20px; margin: 0; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 12px; }
+  h2 { font-size: 15px; margin: 0; color: var(--muted); font-weight: 600; }
+  button { font: inherit; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--accent); background: var(--card); color: var(--accent); cursor: pointer; }
+  button.on { background: var(--accent); color: #fff; }
+  label { display: grid; grid-template-columns: 110px 1fr 70px; align-items: center; gap: 8px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  output { text-align: right; font-variant-numeric: tabular-nums; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .muted { color: var(--muted); font-size: 14px; }
+  pre { margin: 0; font-size: 12px; white-space: pre-wrap; max-height: 260px; overflow: auto; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Device test</h1>
+
+  <section>
+    <h2>Bluetooth heart-rate watch</h2>
+    <p class="muted">Standard Heart Rate profile: chest straps, Garmin "broadcast heart rate", Polar, Wahoo, many Wear OS watches. Needs Chrome or Edge on this PC (localhost).</p>
+    <div class="row"><button id="hr-connect">Connect heart-rate watch</button><span id="hr-live" class="muted"></span></div>
+  </section>
+
+  <section>
+    <h2>Simulated readings</h2>
+    <label>Heart rate <input id="hr" type="range" min="50" max="160" value="72"><output id="v-hr"></output></label>
+    <label>Noise <input id="noise" type="range" min="30" max="110" value="48"><output id="v-noise"></output></label>
+    <label>Movement <input id="move" type="range" min="0" max="100" value="10"><output id="v-move"></output></label>
+    <div class="row"><button id="send">Send once</button><button id="auto">Send every 2 s</button></div>
+  </section>
+
+  <section>
+    <h2>Last ingest reply</h2>
+    <pre id="reply">—</pre>
+  </section>
+
+  <section>
+    <h2>Live state (/api/state)</h2>
+    <pre id="state">—</pre>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+async function ingest(readings) {
+  try {
+    const r = await fetch("/api/devices/ingest", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(readings),
+    });
+    $("reply").textContent = JSON.stringify(await r.json(), null, 2);
+  } catch (err) { $("reply").textContent = `Couldn't reach Timber: ${err.message}`; }
+}
+
+// ---------- simulated readings ----------
+const sliders = [["hr", (v) => `${v} bpm`], ["noise", (v) => `${v} dB`], ["move", (v) => `${(v / 100).toFixed(2)}`]];
+for (const [id, fmt] of sliders) {
+  const show = () => ($(`v-${id}`).textContent = fmt(+$(id).value));
+  $(id).addEventListener("input", show); show();
+}
+const simulated = () => [
+  { device: "simulator", metric: "heart_rate", value: +$("hr").value },
+  { device: "simulator", metric: "noise_db", value: +$("noise").value },
+  { device: "simulator", metric: "movement", value: +$("move").value / 100 },
+];
+$("send").onclick = () => ingest(simulated());
+let autoTimer = null;
+$("auto").onclick = () => {
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+  else { ingest(simulated()); autoTimer = setInterval(() => ingest(simulated()), 2000); }
+  $("auto").classList.toggle("on", !!autoTimer);
+};
+
+// ---------- real heart rate over Bluetooth (from the old project) ----------
+let hrDevice = null, hrLatest = null, hrTimer = null;
+function hrDisconnected() {
+  clearInterval(hrTimer); hrDevice = null; hrLatest = null;
+  $("hr-connect").classList.remove("on"); $("hr-connect").textContent = "Connect heart-rate watch";
+  $("hr-live").textContent = "Disconnected";
+}
+$("hr-connect").onclick = async () => {
+  if (hrDevice) { hrDevice.gatt.disconnect(); return; }
+  if (!navigator.bluetooth) { $("hr-live").textContent = "Bluetooth needs Chrome or Edge."; return; }
+  try {
+    hrDevice = await navigator.bluetooth.requestDevice({ filters: [{ services: ["heart_rate"] }] });
+    hrDevice.addEventListener("gattserverdisconnected", hrDisconnected);
+    const server = await hrDevice.gatt.connect();
+    const ch = await (await server.getPrimaryService("heart_rate")).getCharacteristic("heart_rate_measurement");
+    ch.addEventListener("characteristicvaluechanged", (e) => {
+      const v = e.target.value;  // flags bit 0: value is uint16 instead of uint8
+      hrLatest = v.getUint8(0) & 1 ? v.getUint16(1, true) : v.getUint8(1);
+      $("hr-live").textContent = `${hrDevice.name || "Watch"}: ${hrLatest} bpm`;
+    });
+    await ch.startNotifications();
+    $("hr-connect").classList.add("on"); $("hr-connect").textContent = "Watch connected (tap to disconnect)";
+    // Send at most every 2 s; the gateway ignores 0 bpm (strap lost contact).
+    hrTimer = setInterval(() => hrLatest !== null && ingest(
+      { device: hrDevice.name || "Heart-rate watch", metric: "heart_rate", value: hrLatest }), 2000);
+  } catch (err) {
+    hrDevice = null;
+    $("hr-live").textContent = err.name === "NotFoundError" ? "" : `Couldn't connect: ${err.message}`;
+  }
+};
+
+// ---------- live state ----------
+async function pollState() {
+  try {
+    const s = await (await fetch("/api/state")).json();
+    const rows = Object.entries(s.signals).map(([name, sig]) =>
+      `${name.padEnd(11)} ${String(sig.value).padStart(6)}  from ${sig.source}  ` +
+      `baseline ${sig.baseline.ready ? sig.baseline.mean : `learning ${sig.baseline.readings}/30`}  ` +
+      `deviation ${sig.deviation ?? "—"}`);
+    $("state").textContent = rows.join("\n") || "No readings yet.";
+  } catch { $("state").textContent = "Couldn't reach Timber."; }
+}
+pollState(); setInterval(pollState, 2000);
+</script>
+</body>
+</html>

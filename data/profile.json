@@ -1,0 +1,29 @@
+{
+  "mode": "autism",
+  "name": "Patrick",
+  "needs": [
+    "At the first sign of overload, alert my phone and my trusted person right away",
+    "A gentle vibration first, not a voice or a sound",
+    "When my speech switches off, Timber speaks for me and says it is Timber speaking",
+    "My care circle sees my episodes per day and my mood during them"
+  ],
+  "phrases": [
+    "This is Timber, speaking for Patrick.",
+    "Patrick can't talk right now, but he can hear you.",
+    "He needs a quiet moment, please.",
+    "Yes, please.",
+    "No, thank you.",
+    "Could you write it down or show him instead?"
+  ],
+  "circle": [
+    {
+      "name": "Trusted person",
+      "relation": "trusted person",
+      "sees": ["alerts", "episodes", "mood"]
+    }
+  ],
+  "comfort": {
+    "haptic_only": true,
+    "quiet_hours": null
+  }
+}
