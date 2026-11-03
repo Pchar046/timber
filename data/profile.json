@@ -19,11 +19,22 @@
     {
       "name": "Trusted person",
       "relation": "trusted person",
-      "sees": ["alerts", "episodes", "mood"]
+      "sees": [
+        "alerts",
+        "episodes",
+        "mood"
+      ]
     }
   ],
   "comfort": {
-    "haptic_only": true,
     "quiet_hours": null
+  },
+  "modes": {
+    "autism": {
+      "first_touch": "vibrate"
+    },
+    "dementia": {
+      "first_touch": null
+    }
   }
 }

@@ -1,0 +1,66 @@
+{
+  "updated": 1793664000.0,
+  "rules": [
+    {
+      "id": "seed0001",
+      "kind": "contact",
+      "statement": "Tell my trusted person as soon as overload starts.",
+      "audience": "care circle",
+      "actions": [
+        "notify_circle"
+      ],
+      "words": [],
+      "contact": {
+        "name": "Trusted person",
+        "relation": "trusted person",
+        "how": "app",
+        "when": "rising"
+      },
+      "source": "At the first sign of overload, alert my phone and notify my trusted person, right as it starts.",
+      "t": 1793664000.0
+    },
+    {
+      "id": "seed0002",
+      "kind": "helps",
+      "statement": "A gentle vibration helps first, not a voice or a sound.",
+      "audience": "anyone",
+      "actions": [
+        "vibrate",
+        "notify_phone"
+      ],
+      "words": [],
+      "contact": null,
+      "source": "Haptics first: a gentle vibration, not a voice or sound.",
+      "t": 1793664000.0,
+      "mode": "autism"
+    },
+    {
+      "id": "seed0003",
+      "kind": "avoid",
+      "statement": "Don't use a voice in my ear as the first alert.",
+      "audience": "anyone",
+      "actions": [
+        "whisper"
+      ],
+      "words": [],
+      "contact": null,
+      "source": "Haptics first: a gentle vibration, not a voice or sound.",
+      "t": 1793664000.0,
+      "mode": "autism"
+    },
+    {
+      "id": "seed0004",
+      "kind": "may_say",
+      "statement": "When my speech switches off, Timber may speak for me from my own information, and must say it is Timber speaking.",
+      "audience": "anyone",
+      "actions": [
+        "speak_for_you"
+      ],
+      "words": [],
+      "contact": null,
+      "source": "When speech switches off, Timber speaks on its own from my personal data, and says it is Timber speaking.",
+      "t": 1793664000.0,
+      "mode": "autism"
+    }
+  ]
+}

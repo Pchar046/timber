@@ -1,9 +1,14 @@
 """Muse Voice Transcribe: the Ears. Realtime relay to Meta's ASR websocket.
 
 The browser streams PCM to our backend, and the backend relays it here, so the
-key never leaves the server. Events from Meta are passed to `on_event` as-is:
-`transcript` is a cumulative partial (replace it, don't append), plus `speaker`
-and `speechComplete`.
+key never leaves the server. Events from Meta are passed to `on_event` as-is.
+Observed format (Nov 2), per turn:
+  {"type": "speechStart", "turnId": 0}
+  {"type": "transcript", "transcript": " Hi there, do", "final": false}   cumulative: replace
+  {"type": "speaker", "label": "A"}                                       at the END of the turn
+  {"type": "speechEnd", "turnId": 0}
+  {"type": "speechComplete", "turnId": 0, "transcript": " Hi there, do you need a bag? "}
+plus {"type": "audioProgress", "audioProcessedMs": ...} along the way.
 """
 
 import asyncio
@@ -25,12 +30,14 @@ BYTES_PER_SECOND = SAMPLE_RATE * 2  # 16-bit LE mono
 
 OnEvent = Callable[[dict], Awaitable[None]]
 
-# What demo mode "hears": another speaker asking a question.
+# What demo mode "hears": another speaker asking a question, in Meta's real format.
 _DEMO_SCRIPT = [
-    {"type": "speaker", "speaker": "SPEAKER_1"},
-    {"type": "transcript", "speaker": "SPEAKER_1", "text": "Do you"},
-    {"type": "transcript", "speaker": "SPEAKER_1", "text": "Do you need a bag?"},
-    {"type": "speechComplete", "speaker": "SPEAKER_1"},
+    {"type": "speechStart", "turnId": 0},
+    {"type": "transcript", "transcript": " Do you", "final": False},
+    {"type": "transcript", "transcript": " Do you need a bag?", "final": False},
+    {"type": "speaker", "label": "B"},
+    {"type": "speechEnd", "turnId": 0},
+    {"type": "speechComplete", "turnId": 0, "transcript": " Do you need a bag? "},
 ]
 
 
@@ -101,7 +108,7 @@ class TranscribeSession:
             try:
                 await self._ws.send(json.dumps({"type": "endStream"}))
                 if self._reader:
-                    await asyncio.wait_for(self._reader, 10)  # let final events arrive
+                    await asyncio.wait_for(self._reader, 3)  # let final events arrive
             except Exception:
                 pass
             await self._close_ws()
@@ -149,5 +156,5 @@ async def transcribe_pcm(pcm: bytes, task: str = "transcribe clip", realtime: bo
             if realtime:
                 await asyncio.sleep(0.1)
 
-    texts = [(e.get("text") or e.get("transcript") or "").strip() for e in events if e.get("type") == "transcript"]
+    texts = [(e.get("transcript") or "").strip() for e in events if e.get("type") == "transcript"]
     return {"text": next((t for t in reversed(texts) if t), ""), "events": events, "_status": session.status}

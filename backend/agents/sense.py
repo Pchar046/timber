@@ -2,17 +2,23 @@
 
 Muse Spark judges the whole picture (values, baseline, recent trend). A transparent
 rule score runs alongside as a safety check: if the two disagree by two levels,
-the rules win. Muse is asked at most every 15 s unless the rule level changes.
+the rules win. Muse is asked at most every 15 s unless the rule level changes,
+and always in the background: the rules answer at once while Muse thinks.
 Reasons describe signals and surroundings only, never anything medical.
 """
 
+import asyncio
 import json
-import re
+import logging
 import time
 from collections import deque
+from collections.abc import Awaitable, Callable
 
+from ..core.safety import medical_term
 from ..core.state import state
 from ..meta import spark
+
+log = logging.getLogger(__name__)
 
 LEVELS = ("calm", "rising", "overloaded")
 MUSE_EVERY_S = 15
@@ -30,13 +36,6 @@ CLIMB = {"heart_rate": 8.0, "noise_db": 8.0}               # rise across the las
 RESTLESS = 0.6
 RISING, OVERLOADED = 2, 5
 LABEL = {"heart_rate": ("Heart rate", " bpm"), "noise_db": ("Noise", " dB")}
-
-# Last line of defence for "no medical language" in anything Muse writes.
-_MEDICAL = re.compile(
-    r"\b(panic|anxiety|attack|symptom|diagnos|disorder|condition|syndrome|tachycardi|"
-    r"arrhythmi|seizure|medic|treatment|therapy|meltdown|shutdown|cardiac|blood pressure)",
-    re.I,
-)
 
 SYSTEM = """You are Sense, part of Timber, a daily-living support tool for an autistic adult.
 Judge sensory load right now against THIS person's own baseline and recent trend.
@@ -112,21 +111,21 @@ async def ask_muse(snapshot: dict, rule: dict) -> dict:
     except (TypeError, ValueError):
         confidence = 0.7
     reason = str(out.get("reason") or rule["reason"])[:200]
-    if _MEDICAL.search(reason):
+    if medical_term(reason):
         reason = rule["reason"]
     return {"level": out["level"], "confidence": confidence, "reason": reason, "status": out["_status"]}
 
 
-def combine(muse: dict, rule: dict) -> dict:
+def combine(muse: dict | None, rule: dict) -> dict:
     """Muse decides, unless it is two levels away from the rules (then rules win).
 
-    Without a real Muse answer (demo mode or an error) the live rules decide.
+    Without a current Muse answer (still thinking, demo mode, or an error) the
+    live rules decide, so the first response never waits on the network.
     """
-    gap = abs(LEVELS.index(muse["level"]) - LEVELS.index(rule["level"]))
-    if muse["status"] != "ok":
+    if muse is None or muse["status"] != "ok":
         level, confidence, reason = rule["level"], 0.7, rule["reason"]
-        source = f"rules ({muse['status']})"
-    elif gap >= 2:
+        source = f"rules ({muse['status'] if muse else 'Muse thinking'})"
+    elif abs(LEVELS.index(muse["level"]) - LEVELS.index(rule["level"])) >= 2:
         level, confidence, reason = rule["level"], 0.7, rule["reason"]
         source = "rules (safety override)"
     else:
@@ -143,30 +142,44 @@ def combine(muse: dict, rule: dict) -> dict:
 
 
 class Sense:
-    """Called by the Mind after each burst of readings."""
+    """Called by the Mind after each burst of readings.
+
+    `assess()` answers instantly from the rules plus the latest Muse judgement.
+    When a fresh Muse judgement is due it is fetched in the background, and
+    `on_refresh` (set by the Mind) is awaited when it lands.
+    """
 
     def __init__(self) -> None:
         self.current: dict | None = None
         self.changes: deque[dict] = deque(maxlen=200)  # level transitions only
-        self._muse: dict | None = None
+        self.on_refresh: Callable[[], Awaitable[None]] | None = None
+        self._muse: dict | None = None  # latest judgement, tagged with the rule level it saw
         self._muse_t = 0.0
-        self._rule_level: str | None = None
+        self._task: asyncio.Task | None = None
 
-    async def assess(self) -> dict:
+    def assess(self) -> dict:
         snapshot = state.snapshot()
         rule = rule_assess(snapshot)
-        stale = time.time() - self._muse_t >= MUSE_EVERY_S
-        if self._muse is None or rule["level"] != self._rule_level or stale:
-            self._muse = await ask_muse(snapshot, rule)
-            self._muse_t = time.time()
-        self._rule_level = rule["level"]
+        muse = self._muse if self._muse and self._muse["rule_level"] == rule["level"] else None
+        due = muse is None or time.time() - self._muse_t >= MUSE_EVERY_S
+        if due and (self._task is None or self._task.done()):
+            self._task = asyncio.create_task(self._refresh(snapshot, rule))
 
-        result = combine(self._muse, rule)
+        result = combine(muse, rule)
         changed = self.current is None or result["level"] != self.current["level"]
         self.current = state.sense = result
         if changed:
             self.changes.append(result)
         return result
+
+    async def _refresh(self, snapshot: dict, rule: dict) -> None:
+        try:
+            self._muse = {**await ask_muse(snapshot, rule), "rule_level": rule["level"]}
+            self._muse_t = time.time()
+            if self.on_refresh is not None:
+                await self.on_refresh()
+        except Exception:
+            log.exception("sense refresh failed")
 
 
 sense = Sense()

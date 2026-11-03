@@ -17,7 +17,13 @@ from pydantic import BaseModel, Field
 log = logging.getLogger(__name__)
 
 EventType = Literal[
-    "reading", "speech_heard", "speech_complete", "gesture", "routine_due", "photo", "tick"
+    "reading", "speech_heard", "speech_complete", "speech_paused", "gesture", "routine_due", "photo", "tick"
+]
+
+# What the Mind can decide (the Decision contract in ARCHITECTURE.md).
+Action = Literal[
+    "vibrate", "notify_phone", "notify_circle", "adjust_home",
+    "speak_for_you", "whisper", "remember", "exercise", "none",
 ]
 
 

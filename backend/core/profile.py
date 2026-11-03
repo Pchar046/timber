@@ -1,6 +1,7 @@
 """The person: mode, needs, phrases, care circle and comfort settings.
 
-Loaded from data/profile.json, which the person edits while calm.
+Loaded from data/profile.json, which the person edits while calm. The mode can also
+be switched from the apps, which saves it back to the file.
 """
 
 import json
@@ -20,18 +21,26 @@ class CircleMember(BaseModel):
     sees: list[str] = Field(default_factory=list)  # e.g. alerts, episodes, mood
 
 
+Mode = Literal["autism", "dementia"]
+
+
 class Comfort(BaseModel):
-    haptic_only: bool = True           # first touch is a vibration, never a voice
     quiet_hours: str | None = None     # e.g. "22:00-07:00"
 
 
+class ModeSettings(BaseModel):
+    """The person's own choices for one mode (unset = the mode's default)."""
+    first_touch: Literal["vibrate", "whisper"] | None = None
+
+
 class Profile(BaseModel):
-    mode: Literal["autism", "dementia"]
+    mode: Mode
     name: str
     needs: list[str] = Field(default_factory=list)
     phrases: list[str] = Field(default_factory=list)
     circle: list[CircleMember] = Field(default_factory=list)
     comfort: Comfort = Field(default_factory=Comfort)
+    modes: dict[Mode, ModeSettings] = Field(default_factory=dict)
 
 
 _profile: Profile | None = None
@@ -45,3 +54,10 @@ def load(path: Path = PROFILE_PATH) -> Profile:
 
 def get() -> Profile:
     return _profile or load()
+
+
+def set_mode(mode: Mode, path: Path = PROFILE_PATH) -> Profile:
+    person = get()
+    person.mode = mode
+    path.write_text(person.model_dump_json(indent=2), encoding="utf-8")
+    return person

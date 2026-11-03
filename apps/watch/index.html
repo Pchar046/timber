@@ -20,6 +20,11 @@
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .muted { color: var(--muted); font-size: 14px; }
   pre { margin: 0; font-size: 12px; white-space: pre-wrap; max-height: 260px; overflow: auto; }
+  .devices { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .devices li { display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .devices .what { font-size: 14px; }
+  .devices .state { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .devices button { padding: 4px 10px; font-size: 13px; }
 </style>
 </head>
 <body>
@@ -38,6 +43,13 @@
     <label>Noise <input id="noise" type="range" min="30" max="110" value="48"><output id="v-noise"></output></label>
     <label>Movement <input id="move" type="range" min="0" max="100" value="10"><output id="v-move"></output></label>
     <div class="row"><button id="send">Send once</button><button id="auto">Send every 2 s</button></div>
+  </section>
+
+  <section>
+    <h2>Home: devices Timber can use right now</h2>
+    <ul id="devices" class="devices"><li class="muted">Loading…</li></ul>
+    <div class="row"><button id="add-quiet">Walk into a store (add its quiet-zone light for 60 s)</button></div>
+    <pre id="home-log">—</pre>
   </section>
 
   <section>
@@ -125,6 +137,42 @@ async function pollState() {
   } catch { $("state").textContent = "Couldn't reach Timber."; }
 }
 pollState(); setInterval(pollState, 2000);
+
+// ---------- home: devices as tools ----------
+function describe(state) {
+  const parts = [];
+  if ("brightness" in state) parts.push(state.on === false ? "off" : `${state.brightness}%`);
+  if ("playing" in state) parts.push(state.playing ? "playing" : "paused");
+  if ("volume" in state) parts.push(`vol ${state.volume}`);
+  if ("target" in state) parts.push(`${state.target}°F`);
+  for (const [k, v] of Object.entries(state)) if (!["brightness", "on", "playing", "volume", "target"].includes(k)) parts.push(`${k}: ${JSON.stringify(v)}`);
+  return parts.join(" · ") || "—";
+}
+async function pollHome() {
+  try {
+    const h = await (await fetch("/api/devices/")).json();
+    $("devices").replaceChildren(...h.devices.map((d) => {
+      const li = document.createElement("li");
+      const what = document.createElement("span"); what.className = "what";
+      what.textContent = `${d.name} · ${d.room}${d.ttl_s ? " (nearby)" : ""}`;
+      const state = document.createElement("span"); state.className = "state"; state.textContent = describe(d.state);
+      const remove = document.createElement("button"); remove.textContent = "Remove";
+      remove.onclick = async () => { await fetch(`/api/devices/${d.id}`, { method: "DELETE" }); pollHome(); };
+      li.append(what, state, remove); return li;
+    }));
+    if (!h.devices.length) $("devices").innerHTML = '<li class="muted">No devices nearby.</li>';
+    $("home-log").textContent = h.log.slice(0, 8).map((e) =>
+      `${new Date(e.t * 1000).toLocaleTimeString()}  ${e.detail}`).join("\n") || "—";
+  } catch { $("devices").innerHTML = '<li class="muted">Couldn\'t reach Timber.</li>'; }
+}
+$("add-quiet").onclick = async () => {
+  await fetch("/api/devices/register", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "Quiet-zone light", kind: "light", room: "store", ttl_s: 60, state: { on: true, brightness: 90 } }),
+  });
+  pollHome();
+};
+pollHome(); setInterval(pollHome, 2000);
 </script>
 </body>
 </html>

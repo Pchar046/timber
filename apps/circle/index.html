@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Care Circle</title>
+<style>
+  :root {
+    --bg: #eef4f0; --card: #ffffff; --ink: #22302a; --ink-2: #44554c; --muted: #66796f; --line: #d8e3dc;
+    --grid: #e6ede8; --accent: #3f7d62; --chip: #e6efe9;
+    --calm: #d9eee2; --rising: #f4e9cf; --overloaded: #e2dcf1;
+    --alert-bg: #fff6df; --alert-line: #ecd9a6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141a17; --card: #1d2420; --ink: #e3ebe6; --ink-2: #c3cfc8; --muted: #9aaaa1; --line: #2c3530;
+      --grid: #27302b; --accent: #78b89a; --chip: #26302a;
+      --calm: #1f3329; --rising: #3a3320; --overloaded: #2c2840;
+      --alert-bg: #322b18; --alert-line: #574a24;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+  }
+  main { max-width: 720px; margin: 0 auto; display: grid; gap: 16px; }
+  header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 22px; margin: 0; }
+  .conn { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .conn::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #c9a24a; }
+  .conn.on::before { background: var(--accent); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+  h2 { font-size: 15px; color: var(--muted); font-weight: 600; margin: 0 0 10px; }
+
+  .now { border-radius: 16px; padding: 18px 16px; transition: background 1s ease; background: var(--calm); }
+  .now[data-level="rising"] { background: var(--rising); }
+  .now[data-level="overloaded"] { background: var(--overloaded); }
+  .now p { margin: 0; }
+  .now .big { font-size: 22px; font-weight: 650; }
+  .now .sub { color: var(--ink-2); font-size: 15px; margin-top: 4px; }
+
+  .alerts { display: grid; gap: 8px; list-style: none; margin: 0; padding: 0; }
+  .alert { background: var(--alert-bg); border: 1px solid var(--alert-line); border-radius: 12px; padding: 10px 12px; }
+  .alert.fresh { animation: arrive 1.2s ease; }
+  @keyframes arrive { from { transform: translateY(-6px); opacity: 0; } }
+  .alert .meta { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .tile .value { font-size: 28px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .tile .label { font-size: 13px; color: var(--muted); }
+  @media (max-width: 480px) { .tiles { grid-template-columns: 1fr 1fr; } .tiles .tile:last-child { grid-column: span 2; } }
+
+  /* episodes-per-day chart: one series, thin bars, 4px rounded tops on a baseline */
+  .chart { position: relative; }
+  .plot {
+    position: relative; height: 140px; display: grid; grid-template-columns: repeat(var(--n), 1fr);
+    gap: 2px; align-items: end; border-bottom: 1px solid var(--line);
+    background: repeating-linear-gradient(to top, var(--grid) 0 1px, transparent 1px calc(100% / var(--rows)));
+  }
+  .bar { position: relative; height: 100%; display: flex; align-items: end; justify-content: center; outline: none; cursor: default; }
+  .bar span { width: min(60%, 18px); border-radius: 4px 4px 0 0; background: var(--accent); min-height: 0; }
+  .bar:hover span, .bar:focus-visible span { filter: brightness(1.15); }
+  .bar:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); border-radius: 4px; }
+  .bar .val { position: absolute; font-size: 12px; color: var(--ink-2); transform: translateY(-100%); padding-bottom: 2px; }
+  .ticks { display: grid; grid-template-columns: repeat(var(--n), 1fr); gap: 2px; margin-top: 4px; }
+  .ticks span { text-align: center; font-size: 11px; color: var(--muted); }
+  .tip {
+    position: absolute; pointer-events: none; background: var(--ink); color: var(--card); font-size: 13px;
+    padding: 6px 8px; border-radius: 8px; white-space: nowrap; transform: translate(-50%, -110%); display: none; z-index: 2;
+  }
+  details { margin-top: 10px; font-size: 14px; color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; color: var(--ink); }
+  th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+
+  .episodes { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .episode { border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: grid; gap: 6px; }
+  .episode .top { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .episode .when { font-weight: 600; }
+  .episode .mood { color: var(--ink-2); }
+  .episode .note { margin: 0; color: var(--ink-2); font-size: 15px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-size: 13px; padding: 3px 9px; border-radius: 999px; background: var(--chip); }
+  .empty { color: var(--muted); font-style: italic; margin: 0; }
+  .summary { margin: 0; font-size: 17px; }
+  .patterns { margin: 8px 0 0; padding-left: 20px; color: var(--ink-2); font-size: 15px; }
+  footer { color: var(--muted); font-size: 13px; text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1 id="title">Care circle</h1>
+    <span class="conn" id="conn">Connecting…</span>
+  </header>
+
+  <section class="now" id="now" data-level="calm" aria-live="polite">
+    <p class="big" id="now-word">Calm right now</p>
+    <p class="sub" id="now-sub">No alerts.</p>
+  </section>
+
+  <section class="card" id="review" hidden>
+    <h2 id="review-title">Daily summary</h2>
+    <p class="summary" id="review-summary"></p>
+    <ul class="patterns" id="review-patterns"></ul>
+  </section>
+
+  <section class="card">
+    <h2>Live alerts</h2>
+    <ul class="alerts" id="alerts"><li class="empty">No alerts yet.</li></ul>
+  </section>
+
+  <section class="tiles">
+    <div class="card tile"><div class="value" id="t-today">0</div><div class="label">episodes today</div></div>
+    <div class="card tile"><div class="value" id="t-week">0</div><div class="label" id="t-week-label">this week</div></div>
+    <div class="card tile"><div class="value" id="t-avg">–</div><div class="label">average length</div></div>
+  </section>
+
+  <section class="card chart">
+    <h2>Episodes per day</h2>
+    <div class="plot" id="plot" role="img" aria-label="Episodes per day"></div>
+    <div class="ticks" id="ticks"></div>
+    <div class="tip" id="tip" role="tooltip"></div>
+    <details><summary>Show as a table</summary><table id="table"></table></details>
+  </section>
+
+  <section class="card">
+    <h2>Recent episodes</h2>
+    <ul class="episodes" id="episodes"><li class="empty">No episodes yet.</li></ul>
+  </section>
+
+  <footer>Moods are estimates from signals, not diagnoses. Timber gives no medical advice.</footer>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const NOW_WORDS = { calm: "Calm right now", rising: "Load is rising", overloaded: "Load is very high" };
+const HELPED = { vibrate: "gentle vibration", whisper: "a calm word", adjust_home: "calmer room", speak_for_you: "Timber spoke for them" };
+let name = "Patrick";
+
+function el(tag, props = {}, ...children) {
+  const node = Object.assign(document.createElement(tag), props);
+  node.append(...children.filter((c) => c !== null && c !== undefined && c !== false));
+  return node;
+}
+const clock = (t) => new Date(t * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+const dayName = (iso, opts) => new Date(`${iso}T12:00:00`).toLocaleDateString([], opts);
+const mins = (m) => (m < 1 ? "<1 min" : `${Math.round(m)} min`);
+
+// ---------- right now ----------
+function showNow(level, alert) {
+  $("now").dataset.level = level;
+  $("now-word").textContent = NOW_WORDS[level] || NOW_WORDS.calm;
+  if (alert) $("now-sub").textContent = `${alert.message} (${clock(alert.t)})`;
+  else if (level === "calm") $("now-sub").textContent = "Timber is quietly listening.";
+}
+
+// ---------- alerts ----------
+function alertItem(a, fresh) {
+  return el("li", { className: `alert${fresh ? " fresh" : ""}` },
+    el("div", { textContent: a.message }),
+    el("div", { className: "meta", textContent: `${clock(a.t)} · to ${a.to.join(", ") || "care circle"} · ${a.status}` }));
+}
+function showAlerts(alerts) {
+  $("alerts").replaceChildren(...(alerts.length ? alerts.slice(0, 5).map((a) => alertItem(a)) : [el("li", { className: "empty", textContent: "No alerts yet." })]));
+}
+
+// ---------- chart ----------
+function showChart(days) {
+  const max = Math.max(3, ...days.map((d) => d.episodes));
+  const plot = $("plot"), ticks = $("ticks"), tip = $("tip");
+  plot.style.setProperty("--n", days.length); ticks.style.setProperty("--n", days.length);
+  plot.style.setProperty("--rows", max);
+  const today = days[days.length - 1].date;
+  plot.setAttribute("aria-label", `Episodes per day, last ${days.length} days. Table below.`);
+  plot.replaceChildren(...days.map((d) => {
+    const label = `${dayName(d.date, { weekday: "short", month: "short", day: "numeric" })}: ` +
+      `${d.episodes} episode${d.episodes === 1 ? "" : "s"}${d.episodes ? `, ${mins(d.minutes)} total` : ""}`;
+    const bar = el("div", { className: "bar", tabIndex: 0, ariaLabel: label },
+      el("span", { style: `height:${(d.episodes / max) * 100}%` }),
+      d.date === today && d.episodes ? el("em", { className: "val", style: `bottom:${(d.episodes / max) * 100}%`, textContent: d.episodes }) : null);
+    const show = () => {
+      tip.textContent = label; tip.style.display = "block";
+      const box = bar.getBoundingClientRect(), host = plot.parentElement.getBoundingClientRect();
+      tip.style.left = `${Math.min(Math.max(box.left - host.left + box.width / 2, 70), host.width - 70)}px`;
+      tip.style.top = `${plot.offsetTop + plot.offsetHeight * (1 - d.episodes / max)}px`;
+    };
+    const hide = () => (tip.style.display = "none");
+    bar.addEventListener("mouseenter", show); bar.addEventListener("focus", show);
+    bar.addEventListener("mouseleave", hide); bar.addEventListener("blur", hide);
+    return bar;
+  }));
+  ticks.replaceChildren(...days.map((d, i) => el("span", {
+    textContent: i % 2 === days.length % 2 || d.date === today ? dayName(d.date, { weekday: "narrow" }) : "",
+  })));
+  $("table").replaceChildren(
+    el("tr", {}, el("th", { textContent: "Day" }), el("th", { textContent: "Episodes" }), el("th", { textContent: "Minutes" })),
+    ...days.slice().reverse().map((d) => el("tr", {},
+      el("td", { textContent: dayName(d.date, { weekday: "short", month: "short", day: "numeric" }) }),
+      el("td", { textContent: d.episodes }), el("td", { textContent: Math.round(d.minutes) }))));
+}
+
+// ---------- tiles + episodes ----------
+function showTiles(s) {
+  const today = s.days[s.days.length - 1];
+  $("t-today").textContent = today.episodes;
+  $("t-week").textContent = s.trend.this_week;
+  $("t-week-label").textContent = s.trend.direction === "same"
+    ? "this week, same as last"
+    : `this week, ${s.trend.direction} than last (${s.trend.last_week})`;
+  const lengths = s.episodes.map((e) => e.minutes);
+  $("t-avg").textContent = lengths.length ? mins(lengths.reduce((a, b) => a + b, 0) / lengths.length) : "–";
+}
+
+function showEpisodes(episodes) {
+  if (!episodes.length) { $("episodes").replaceChildren(el("li", { className: "empty", textContent: "No episodes yet." })); return; }
+  $("episodes").replaceChildren(...episodes.slice(0, 10).map((e) => el("li", { className: "episode" },
+    el("div", { className: "top" },
+      el("span", { className: "when", textContent: `${new Date(e.start * 1000).toLocaleDateString([], { weekday: "short" })} ${clock(e.start)} · ${e.end ? mins(e.minutes) : "ongoing"}` }),
+      el("span", { className: "mood", textContent: e.mood ? `Mood: ${e.mood} (estimated)` : "Mood: estimating…" })),
+    e.note ? el("p", { className: "note", textContent: e.note }) : null,
+    el("div", { className: "chips" },
+      el("span", { className: "chip", textContent: `peak: ${e.peak_level === "overloaded" ? "very high" : "rising"}` }),
+      el("span", { className: "chip", textContent: `started by ${e.started_by}` }),
+      ...e.helped.map((h) => el("span", { className: "chip", textContent: `helped: ${HELPED[h] || h}` }))),
+  )));
+}
+
+async function load() {
+  try {
+    const s = await (await fetch("/api/circle")).json();
+    name = s.name;
+    $("title").textContent = `${name}'s care circle`;
+    document.title = `${name} · Care Circle`;
+    showNow(s.now.level, s.now.episode ? s.alerts[0] : null);
+    showAlerts(s.alerts); showTiles(s); showChart(s.days); showEpisodes(s.episodes); showReview(s.reflection);
+  } catch { $("now-sub").textContent = "Couldn't reach Timber."; }
+}
+
+// ---------- nightly summary ----------
+function showReview(r) {
+  if (!r) return;
+  $("review").hidden = false;
+  $("review-title").textContent = `Daily summary · ${dayName(r.day, { weekday: "long", month: "short", day: "numeric" })}`;
+  $("review-summary").textContent = r.summary;
+  $("review-patterns").replaceChildren(...r.patterns.map((p) => el("li", { textContent: p.text })));
+}
+
+// ---------- live feed ----------
+let retry = 1000;
+function connect() {
+  const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/circle`);
+  ws.onopen = () => { retry = 1000; $("conn").textContent = "Live"; $("conn").classList.add("on"); load(); };
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.kind === "state") showNow(msg.level);
+    if (msg.kind === "alert") {
+      showNow(msg.alert.level, msg.alert);
+      const list = $("alerts"); list.querySelector(".empty")?.remove();
+      list.prepend(alertItem(msg.alert, true));
+      if (document.hidden) document.title = `● ${name} · Care Circle`;
+      load();
+    }
+    if (msg.kind === "episode") load();
+    if (msg.kind === "reflection") showReview(msg.reflection);
+  };
+  ws.onclose = () => {
+    $("conn").textContent = "Reconnecting…"; $("conn").classList.remove("on");
+    setTimeout(connect, retry); retry = Math.min(retry * 2, 10000);
+  };
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) document.title = `${name} · Care Circle`; });
+load(); connect();
+</script>
+</body>
+</html>

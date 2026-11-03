@@ -1,0 +1,7 @@
+{
+  "note": "Today's plan, written by the person or their family. Orientation reads it word for word.",
+  "items": [
+    {"time": "10:00", "text": "Coffee and the crossword", "days": ["daily"]},
+    {"time": "18:00", "text": "Maria visits", "days": ["daily"]}
+  ]
+}

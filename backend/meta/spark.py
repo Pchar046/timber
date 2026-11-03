@@ -50,9 +50,14 @@ async def ask_json(
     model: str = MODEL,
     temperature: float = 0.2,
     timeout: float = 30,
+    reasoning_effort: str | None = None,
 ) -> dict:
-    """Ask for one JSON object. Returns `fallback` (with `_status`) in demo mode or on error."""
-    payload = {
+    """Ask for one JSON object. Returns `fallback` (with `_status`) in demo mode or on error.
+
+    `reasoning_effort` ("minimal", "low", ...) trades depth for speed; open-ended
+    prompts can take 30 s at the default.
+    """
+    payload: dict = {
         "model": model,
         "temperature": temperature,
         "messages": [
@@ -60,6 +65,8 @@ async def ask_json(
             {"role": "user", "content": user_content(user, images)},
         ],
     }
+    if reasoning_effort:
+        payload["reasoning_effort"] = reasoning_effort
 
     async def run() -> dict:
         reply = await post("/chat/completions", payload, timeout)
@@ -77,6 +84,7 @@ async def chat(
     model: str = MODEL,
     temperature: float = 0.2,
     timeout: float = 30,
+    reasoning_effort: str | None = None,
 ) -> dict:
     """Free-form chat, optionally with tool calling.
 
@@ -86,6 +94,8 @@ async def chat(
     payload: dict = {"model": model, "temperature": temperature, "messages": messages}
     if tools:
         payload["tools"] = tools
+    if reasoning_effort:
+        payload["reasoning_effort"] = reasoning_effort
 
     async def run() -> dict:
         msg = _message(await post("/chat/completions", payload, timeout))

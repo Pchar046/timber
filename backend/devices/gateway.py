@@ -8,10 +8,11 @@ sensor) are dropped with a reason instead of polluting the baseline.
 import math
 from typing import Any
 
-from fastapi import APIRouter
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 
 from ..core.events import Event, bus
+from .home import KIND_ACTIONS, Device, ToolAction, home, slug
 
 router = APIRouter(prefix="/api/devices", tags=["devices"])
 
@@ -76,3 +77,45 @@ async def ingest(body: Reading | list[Reading]) -> dict:
         else:
             accepted.append(result)
     return {"accepted": accepted, "ignored": ignored}
+
+
+# ---------- devices as tools ----------
+class DeviceIn(BaseModel):
+    """A device announcing itself. Known kinds get standard actions if none are given."""
+
+    name: str = Field(min_length=1, max_length=60)
+    kind: str = Field(min_length=1, max_length=30)
+    room: str = Field(min_length=1, max_length=40)
+    actions: list[ToolAction] | None = None
+    state: dict[str, Any] = Field(default_factory=dict)
+    ttl_s: float | None = Field(default=None, gt=0, description="Expire unless renewed within this many seconds")
+
+
+@router.get("/")
+def list_devices() -> dict:
+    """Devices present now, their state, and what they've been doing."""
+    return home.snapshot()
+
+
+@router.post("/register")
+def register_device(body: DeviceIn) -> Device:
+    actions = body.actions or KIND_ACTIONS.get(body.kind.lower())
+    if not actions:
+        raise HTTPException(422, f"Unknown kind '{body.kind}': say which actions it offers.")
+    device = Device(id=slug(f"{body.room} {body.name}" if body.room.lower() not in body.name.lower() else body.name),
+                    name=body.name, kind=body.kind.lower(), room=body.room, actions=actions,
+                    state=body.state, source="announced", ttl_s=body.ttl_s)
+    return home.register(device)
+
+
+@router.delete("/{device_id}")
+def remove_device(device_id: str) -> dict:
+    if not home.remove(device_id):
+        raise HTTPException(404, "No device with that id.")
+    return {"removed": device_id}
+
+
+@router.get("/search")
+def search_devices(q: str) -> list[str]:
+    """Tool search, as the agents see it: device ids matching `q`."""
+    return [d.id for d in home.search(q)]

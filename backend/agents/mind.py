@@ -1,13 +1,15 @@
 """The Mind: reads every event and decides what happens next, one step at a time.
 
-Autism-mode escalation ladder (least intrusive first, per the person's choices):
-  1. rising              -> vibrate (or whisper), notify_phone, notify_circle
+Escalation ladder (least intrusive first, per the person's choices):
+  1. rising              -> first touch (Autism mode: vibrate; Dementia mode: a calm
+                            whisper), notify_phone, notify_circle
   2. still climbing      -> adjust_home
-  3. speech switched off -> speak_for_you when someone talks to them
+  3. speech switched off -> speak_for_you when someone talks to them (Autism mode only)
   4. calm again          -> remember (save the episode)
 
-Each step happens at most once per episode. Every decision is logged with its
-reason and saved. The Mind calls the specialist agents; for now it calls Sense,
+Each step happens at most once per episode. Before any action, the Mind checks
+the Calm-Self Contract; a forbidden action is logged as skipped, citing the
+rule. Every decision is logged with its reason and saved. The Mind calls the specialist agents; for now it calls Sense,
 and the others act on its decisions as they are built.
 """
 
@@ -18,20 +20,18 @@ import time
 import uuid
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ..core import db, profile
-from ..core.events import Event, bus
+from ..core import contract, db, echo, modes, profile
+from ..core.events import Action, Event, bus
+from ..core.feed import Feed
+from ..core.state import state
+from ..devices.home import CALM_QUERY, home
 from .sense import sense
 
 log = logging.getLogger(__name__)
-
-Action = Literal[
-    "vibrate", "notify_phone", "notify_circle", "adjust_home",
-    "speak_for_you", "whisper", "remember", "exercise", "none",
-]
 
 AGENT_FOR: dict[str, str] = {
     "vibrate": "mind", "whisper": "mind", "notify_phone": "guardian",
@@ -64,6 +64,9 @@ class Episode:
     peak_level: str = "rising"
     peak_score: int = 0
     actions: list[str] = field(default_factory=list)
+    tried: set[str] = field(default_factory=set)     # ladder steps considered (done or skipped)
+    notified: set[str] = field(default_factory=set)  # care-circle names already told
+    peaks: dict[str, float] = field(default_factory=dict)  # highest reading per signal
     calm_streak: int = 0
     overloaded_since: float | None = None
     last_own_speech: float | None = None
@@ -85,6 +88,7 @@ class Episode:
         return {
             "id": self.id, "start": self.start, "end": end, "trigger": self.trigger,
             "peak_level": self.peak_level, "peak_score": self.peak_score, "actions": self.actions,
+            "peaks": self.peaks,
         }
 
 
@@ -92,33 +96,32 @@ class Mind:
     def __init__(self) -> None:
         self.decisions: deque[Decision] = deque(maxlen=500)
         self.episode: Episode | None = None
-        self._queues: set[asyncio.Queue[dict]] = set()
-
-    # ---------- live feed for the apps ----------
-    def subscribe(self) -> asyncio.Queue[dict]:
-        queue: asyncio.Queue[dict] = asyncio.Queue(200)
-        self._queues.add(queue)
-        return queue
-
-    def unsubscribe(self, queue: asyncio.Queue[dict]) -> None:
-        self._queues.discard(queue)
+        self.feed = Feed("mind")  # state + decisions, for the apps and the Guardian
+        sense.on_refresh = self.on_sense_refresh
 
     def status(self) -> dict:
         return {
             "kind": "state",
             "sense": sense.current,
             "episode": self.episode.summary() if self.episode else None,
+            "mode": modes.current().public(),
         }
-
-    def _broadcast(self, message: dict) -> None:
-        for queue in self._queues:
-            try:
-                queue.put_nowait(message)
-            except asyncio.QueueFull:
-                log.warning("app feed queue full; dropping %s", message.get("kind"))
 
     # ---------- decisions ----------
     def decide(self, action: Action, level: str, reason: str, **data: Any) -> Decision:
+        """Record one decision, after checking the contract (which stands in for consent)."""
+        if self.episode is not None:
+            self.episode.tried.add(action)
+            if "blocked" in data:  # a skipped step counts as tried, so it isn't retried every reading
+                self.episode.tried.add(data["blocked"])
+        if action not in ("remember", "none"):
+            verdict = contract.check(action, level, data.get("text"), data.get("to"))
+            if not verdict.allowed:
+                return self.decide("none", level, f"Skipped {action}: {verdict.reason}",
+                                   blocked=action, rules=verdict.rules)
+            if verdict.rules:
+                reason = f"{reason} (Contract: {verdict.reason})"
+                data["rules"] = verdict.rules
         if self.episode is not None:
             data.setdefault("episode", self.episode.id)
             self.episode.actions.append(action)
@@ -130,7 +133,7 @@ class Mind:
              json.dumps(decision.data), decision.t),
         )
         log.info("decision %s (%s): %s", action, level, reason)
-        self._broadcast({"kind": "decision", "decision": decision.model_dump()})
+        self.feed.publish({"kind": "decision", "decision": decision.model_dump()})
         return decision
 
     def recent(self, limit: int = 50) -> list[Decision]:
@@ -141,16 +144,31 @@ class Mind:
         ep = Episode(id=uuid.uuid4().hex[:8], start=time.time(), trigger=trigger,
                      start_score=score, peak_level=level, peak_score=score)
         self.episode = ep
-        person = profile.get()
-        first_touch = "vibrate" if person.mode == "autism" or person.comfort.haptic_only else "whisper"
-        touch = "Gentle vibration first, no voice or sound." if first_touch == "vibrate" else "A calm word in the ear."
-        self.decide(first_touch, level, f"{why} {touch}")
-        self.decide("notify_phone", level, "First sign of overload: alerting your phone right away, as you asked.")
-        circle = [m.name for m in person.circle if "alerts" in m.sees]
-        if circle:
-            self.decide("notify_circle", level,
-                        f"Telling {', '.join(circle)} right away, as you asked.", to=circle)
+        if modes.first_touch() == "vibrate":
+            self.decide("vibrate", level, f"{why} Gentle vibration first, no voice or sound.")
+        else:
+            line = modes.whisper_line()
+            self.decide("whisper", level, f'{why} A calm word in the ear: "{line}"', text=line)
+        self.decide("notify_phone", level, "First sign of overload: alerting your phone right away.")
+        self._notify_circle(level, why)
         return ep
+
+    def _notify_circle(self, level: str, why: str) -> None:
+        """Tell the people due at this level who haven't been told yet.
+
+        Contact rules in the contract decide who; without any, the profile's
+        care circle members who see alerts are told at the first sign.
+        """
+        ep = self.episode
+        assert ep is not None
+        rules = contract.contacts(level)
+        if rules:
+            due = [r.contact.name for r in rules if r.contact and r.contact.name not in ep.notified]
+        else:
+            due = [m.name for m in profile.get().circle if "alerts" in m.sees and m.name not in ep.notified]
+        if due:
+            ep.notified.update(due)
+            self.decide("notify_circle", level, f"Telling {', '.join(due)} now.", to=due, why=why)
 
     def _end_episode(self) -> None:
         ep = self.episode
@@ -158,19 +176,27 @@ class Mind:
         end = time.time()
         minutes = (end - ep.start) / 60
         self.decide("remember", "calm",
-                    f"Calm again after {minutes:.1f} min (peak: {ep.peak_level}). Saving the episode.")
+                    f"Calm again after {minutes:.1f} min (peak: {ep.peak_level}). Saving the episode.",
+                    summary=ep.summary(end))
         db.execute(
-            "INSERT OR REPLACE INTO episodes (id, start, end, peak_level, peak_score, trigger, actions) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (ep.id, ep.start, end, ep.peak_level, ep.peak_score, ep.trigger, json.dumps(ep.actions)),
+            "INSERT OR REPLACE INTO episodes "
+            "(id, start, end, peak_level, peak_score, trigger, actions, peaks) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (ep.id, ep.start, end, ep.peak_level, ep.peak_score, ep.trigger,
+             json.dumps(ep.actions), json.dumps(ep.peaks)),
         )
         self.episode = None
 
     async def on_readings(self) -> None:
-        self._ladder(await sense.assess())
-        self._broadcast(self.status())
+        self._ladder(sense.assess(), new_readings=True)
+        self.feed.publish(self.status())
 
-    def _ladder(self, result: dict) -> None:
+    async def on_sense_refresh(self) -> None:
+        """Muse Spark's judgement just landed: re-run the ladder with it."""
+        self._ladder(sense.assess(), new_readings=False)
+        self.feed.publish(self.status())
+
+    def _ladder(self, result: dict, new_readings: bool) -> None:
         level, score, why = result["level"], result["rule"]["score"], result["reason"]
         now = time.time()
         ep = self.episode
@@ -181,22 +207,32 @@ class Mind:
             ep = self._start_episode(level, score, f"Load is {level}: {why}.", trigger="sense")
 
         if level == "calm":
-            ep.calm_streak += 1
+            ep.calm_streak += new_readings  # only fresh readings count toward "calm again"
             if ep.calm_streak >= CALM_READINGS:
                 self._end_episode()
             return
         ep.calm_streak = 0
         ep.peak_score = max(ep.peak_score, score)
+        for name, sig in state.signals.items():
+            ep.peaks[name] = max(ep.peaks.get(name, sig["value"]), sig["value"])
         if level == "overloaded":
             ep.peak_level = "overloaded"
             ep.overloaded_since = ep.overloaded_since or now
+            self._notify_circle(level, why)  # anyone the contract says to tell only when overloaded
         else:
             ep.overloaded_since = None
 
         climbing = score >= ep.start_score + CLIMB_POINTS
-        if "adjust_home" not in ep.actions and (level == "overloaded" or climbing):
+        if "adjust_home" not in ep.tried and (level == "overloaded" or climbing):
             because = "overloaded" if level == "overloaded" else f"still climbing (score {ep.start_score} → {score})"
-            self.decide("adjust_home", level, f"Load is {because}: {why}. Lowering lights and sound at home.")
+            devices = home.search(CALM_QUERY)  # whatever is nearby right now
+            if devices:
+                names = ", ".join(d.name for d in devices)
+                self.decide("adjust_home", level, f"Load is {because}: {why}. Calming the room with: {names}.",
+                            why=why, devices=[d.id for d in devices])
+            else:
+                self.decide("none", level, f"Load is {because}, but no lights or speakers are nearby to adjust.",
+                            blocked="adjust_home")
 
     def on_speech(self, event: Event) -> None:
         ep = self.episode
@@ -207,6 +243,12 @@ class Mind:
             ep.speech_off_gesture = False
             return
         if event.type != "speech_complete":  # wait for the whole question
+            return
+        if event.data.get("is_me") is None:  # unknown speaker: might be the person themselves
+            return
+        if echo.is_echo(event.data.get("text", "")):  # the mic heard Timber itself
+            return
+        if "speak_for_you" not in modes.current().actions:  # Dementia mode helps find words instead
             return
         off, why = ep.speech_off(event.t)
         if off:
@@ -226,7 +268,7 @@ class Mind:
             self.episode.speech_off_gesture = True
         elif kind == "speech_on" and self.episode is not None:
             self.episode.speech_off_gesture = False
-        self._broadcast(self.status())
+        self.feed.publish(self.status())
 
     # ---------- loop ----------
     async def handle(self, batch: list[Event]) -> None:

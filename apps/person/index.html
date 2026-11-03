@@ -8,14 +8,14 @@
 <style>
   :root {
     --bg: #eef4f0; --card: #ffffff; --ink: #22302a; --muted: #66796f; --line: #d8e3dc;
-    --accent: #3f7d62; --accent-ink: #ffffff;
+    --accent: #3f7d62; --accent-ink: #ffffff; --grid: #e6ede8;
     --calm: #d9eee2; --rising: #f4e9cf; --overloaded: #e2dcf1;
     --banner: #fff6df; --banner-line: #ecd9a6;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #141a17; --card: #1d2420; --ink: #e3ebe6; --muted: #9aaaa1; --line: #2c3530;
-      --accent: #78b89a; --accent-ink: #0f1512;
+      --accent: #78b89a; --accent-ink: #0f1512; --grid: #27302b;
       --calm: #1f3329; --rising: #3a3320; --overloaded: #2c2840;
       --banner: #322b18; --banner-line: #574a24;
     }
@@ -42,10 +42,17 @@
     transition: background 1.2s ease;
   }
   .level .word { font-size: 34px; font-weight: 650; margin: 0; }
+  .mode-badge { font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; margin-left: 8px; font-weight: 500; vertical-align: middle; }
+  /* Dementia mode: bigger, slower, fewer things on screen */
+  body[data-mode="dementia"] { font-size: 20px; }
+  body[data-mode="dementia"] .level .word { font-size: 40px; }
+  body[data-mode="dementia"] .level .reason { font-size: 18px; }
+  body[data-mode="dementia"] .break { min-height: 140px; font-size: 30px; }
+  body[data-mode="dementia"] .autism-only { display: none; }
   .level .reason { color: var(--muted); margin: 8px 0 0; font-size: 15px; }
-  .level.pulse { animation: pulse 1.6s ease-in-out 3; }
+  .level.pulse, .word-card.pulse { animation: pulse 1.6s ease-in-out 3; }
   @keyframes pulse { 50% { transform: scale(1.025); box-shadow: 0 0 0 10px color-mix(in srgb, var(--tint) 60%, transparent); } }
-  @media (prefers-reduced-motion: reduce) { .level.pulse { animation: none; outline: 3px solid var(--accent); } }
+  @media (prefers-reduced-motion: reduce) { .level.pulse, .word-card.pulse { animation: none; outline: 3px solid var(--accent); } }
 
   .banner {
     display: none; background: var(--banner); border: 1px solid var(--banner-line); border-radius: 16px;
@@ -73,6 +80,83 @@
   section.log li { display: flex; justify-content: space-between; gap: 12px; font-size: 15px; }
   section.log time { color: var(--muted); font-size: 13px; white-space: nowrap; }
 
+  .said p { margin: 0; }
+  .said #said-text { font-size: 18px; }
+  .said .receipts { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .word-card { background: var(--card); border: 2px solid var(--accent); border-radius: 20px; padding: 16px; text-align: center; }
+  .word-card h2 { font-size: 14px; color: var(--muted); font-weight: 600; margin: 0; }
+  .word-card .best { font-size: 40px; font-weight: 700; margin: 4px 0; overflow-wrap: anywhere; }
+  .word-card .more { color: var(--muted); margin: 0; }
+  .word-card .heard { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+  .speak-toggle { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 15px; }
+  .speak-toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
+
+  /* progress: one series, thin bars with 4px rounded tops, recessive grid */
+  .progress { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; display: grid; gap: 12px; position: relative; }
+  .progress h2 { font-size: 14px; color: var(--muted); font-weight: 600; margin: 0; }
+  .progress h3 { font-size: 15px; font-weight: 600; margin: 4px 0 0; }
+  .story { margin: 0; }
+  .ptiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ptiles > div { background: var(--bg); border-radius: 12px; padding: 10px 12px; }
+  .pv { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .pl { font-size: 13px; color: var(--muted); }
+  .plot {
+    height: 110px; display: grid; grid-template-columns: repeat(var(--n), 1fr); gap: 2px; align-items: end;
+    border-bottom: 1px solid var(--line);
+    background: repeating-linear-gradient(to top, var(--grid) 0 1px, transparent 1px calc(100% / var(--rows)));
+  }
+  .bar { height: 100%; display: flex; align-items: end; justify-content: center; outline: none; }
+  .bar span { width: min(60%, 14px); border-radius: 4px 4px 0 0; background: var(--accent); }
+  .bar:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); border-radius: 4px; }
+  .ticks { display: grid; grid-template-columns: repeat(var(--n), 1fr); gap: 2px; margin-top: 4px; }
+  .ticks span { text-align: center; font-size: 11px; color: var(--muted); }
+  .tip {
+    position: absolute; pointer-events: none; background: var(--ink); color: var(--card); font-size: 13px;
+    padding: 6px 8px; border-radius: 8px; white-space: nowrap; transform: translate(-50%, -110%); display: none; z-index: 2;
+  }
+  .progress details { font-size: 14px; color: var(--muted); }
+  .progress table { width: 100%; border-collapse: collapse; margin-top: 6px; color: var(--ink); }
+  .progress th, .progress td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  .helps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .helps .name { display: flex; justify-content: space-between; gap: 8px; font-size: 15px; }
+  .helps .name span:last-child { color: var(--muted); font-size: 13px; white-space: nowrap; }
+  .helps .track { height: 8px; border-radius: 4px; background: var(--grid); margin-top: 4px; }
+  .helps .fill { height: 100%; border-radius: 4px; background: var(--accent); }
+  .muted { color: var(--muted); font-size: 15px; margin: 0; }
+
+  .remembers { background: var(--card); border: 2px solid var(--accent); border-radius: 20px; padding: 16px; display: grid; gap: 8px; }
+  .remembers h2 { font-size: 14px; color: var(--muted); font-weight: 600; margin: 0; }
+  .remembers .said { font-size: 20px; margin: 0; }
+  .remembers ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
+  .ask { display: flex; gap: 8px; }
+  .ask input { flex: 1; min-width: 0; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit; }
+  .ask button, .orient-btn { padding: 12px 16px; border-radius: 12px; border: 1px solid var(--accent); background: var(--card); color: var(--ink); font: 600 16px/1.2 inherit; cursor: pointer; }
+  .orient-btn { width: 100%; }
+  .find { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; display: grid; gap: 10px; }
+  .find h2 { font-size: 14px; color: var(--muted); font-weight: 600; margin: 0; }
+  .find .row { display: flex; gap: 8px; }
+  .find input[type=text] { flex: 1; min-width: 0; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; }
+  .find label.camera { padding: 12px 16px; border-radius: 12px; background: var(--accent); color: var(--accent-ink); font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .find label.camera input { display: none; }
+  .shot { position: relative; border-radius: 12px; overflow: hidden; }
+  .shot img { display: block; width: 100%; height: auto; }
+  .shot .box { position: absolute; border: 3px solid #f2c94c; border-radius: 6px; box-shadow: 0 0 0 2px rgba(0,0,0,.45); }
+  .find .answer { font-size: 20px; margin: 0; }
+  .find .receipt { color: var(--muted); font-size: 13px; margin: 0; }
+  .activities { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; gap: 12px; }
+  body[data-mode="dementia"] .activities { display: grid; }
+  .activities h2 { font-size: 14px; color: var(--muted); font-weight: 600; margin: 0 0 10px; }
+  .activity { display: grid; gap: 10px; }
+  .activity img { width: 100%; border-radius: 14px; aspect-ratio: 1; object-fit: cover; background: var(--bg); }
+  .activity .q { font-size: 22px; font-weight: 600; margin: 0; }
+  .activity .a { font-size: 22px; margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--calm); }
+  .activity .from { color: var(--muted); font-size: 14px; margin: 0; }
+  .activity .buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+  .activity button { flex: 1; padding: 14px; border-radius: 14px; font: 600 18px/1.2 inherit; cursor: pointer; border: 1px solid var(--accent); background: var(--card); color: var(--ink); }
+  .activity button.main { background: var(--accent); color: var(--accent-ink); border: 0; }
+  .dementia-only { display: none; }
+  body[data-mode="dementia"] .dementia-only { display: block; }
+
   .start {
     position: fixed; inset: 0; background: var(--bg); display: grid; place-items: center;
     text-align: center; padding: 24px; z-index: 10; cursor: pointer;
@@ -89,7 +173,7 @@
 
 <main>
   <header>
-    <h1>Timber</h1>
+    <h1>Timber<span class="mode-badge" id="mode-badge"></span></h1>
     <span class="conn" id="conn">Connecting…</span>
   </header>
 
@@ -98,24 +182,85 @@
     <button id="banner-close" aria-label="Dismiss">✕</button>
   </div>
 
+  <section class="word-card" id="word" aria-live="polite" hidden>
+    <h2>Maybe the word is</h2>
+    <p class="best" id="word-best"></p>
+    <p class="more" id="word-more"></p>
+    <p class="heard" id="word-heard"></p>
+  </section>
+
+  <section class="remembers" id="remembers" aria-live="polite" hidden>
+    <h2 id="rem-title">Timber remembers</h2>
+    <p class="said" id="rem-text"></p>
+    <ul id="rem-receipts"></ul>
+  </section>
+
   <section class="level" id="level" aria-live="polite">
     <p class="word" id="level-word">Calm</p>
     <p class="reason" id="level-reason">Waiting for readings.</p>
   </section>
 
   <button class="break" id="break">I need a break</button>
-  <button class="words" id="words" aria-pressed="false">My words are off</button>
+  <button class="words autism-only" id="words" aria-pressed="false">My words are off</button>
+  <button class="orient-btn dementia-only" id="orient">What's happening today?</button>
   <p class="note" id="note"></p>
+  <form class="ask" id="ask">
+    <input id="ask-text" placeholder="Ask Timber, e.g. What did I say this morning?" autocomplete="off">
+    <button>Ask</button>
+  </form>
+
+  <section class="log said" id="said" hidden>
+    <h2>Timber said for you</h2>
+    <p id="said-text"></p>
+    <p class="receipts" id="said-receipts"></p>
+  </section>
+  <label class="speak-toggle autism-only"><input type="checkbox" id="speak-here"> Speak Timber's replies out loud from this phone</label>
+  <label class="speak-toggle"><input type="checkbox" id="say-word"> Say the missing word quietly to me</label>
 
   <section class="log">
     <h2>What Timber did</h2>
     <ul id="log"><li><span>Nothing yet.</span></li></ul>
   </section>
+
+  <section class="activities dementia-only" aria-labelledby="act-title">
+    <h2 id="act-title">Something to remember</h2>
+    <div id="activity"><p class="muted">Nothing for now.</p></div>
+  </section>
+
+  <section class="find" aria-labelledby="find-title">
+    <h2 id="find-title">Find something</h2>
+    <div class="row">
+      <input type="text" id="find-q" value="Where are my keys?" aria-label="What are you looking for?">
+      <label class="camera">Photo<input type="file" id="find-photo" accept="image/*" capture="environment"></label>
+    </div>
+    <div class="shot" id="find-shot" hidden><img id="find-img" alt="Your photo"><div class="box" id="find-box" hidden></div></div>
+    <p class="answer" id="find-answer" aria-live="polite"></p>
+    <p class="receipt" id="find-receipt"></p>
+  </section>
+
+  <section class="progress" aria-labelledby="progress-title">
+    <h2 id="progress-title">My progress</h2>
+    <p class="story" id="story">Loading…</p>
+    <div class="ptiles">
+      <div><div class="pv" id="p-eps">0</div><div class="pl">episodes this week</div></div>
+      <div><div class="pv" id="p-avg">–</div><div class="pl" id="p-avg-label">average length</div></div>
+    </div>
+    <h3>Episodes per day</h3>
+    <div>
+      <div class="plot" id="plot" role="img"></div>
+      <div class="ticks" id="ticks"></div>
+    </div>
+    <div class="tip" id="tip" role="tooltip"></div>
+    <details><summary>Show as a table</summary><table id="ptable"></table></details>
+    <h3>What helped most</h3>
+    <ul class="helps" id="helps"><li class="muted">Nothing yet.</li></ul>
+  </section>
 </main>
 
 <script>
 const $ = (id) => document.getElementById(id);
-const WORDS = { calm: "Calm", rising: "Getting busy", overloaded: "A lot right now" };
+let WORDS = { calm: "Calm", rising: "Getting busy", overloaded: "A lot right now" };
+let BANNER = "Things are getting a lot. Timber is with you.";
 const VIBRATE = [60, 120, 60];  // gentle: short, soft, short
 let started = false;
 
@@ -128,6 +273,9 @@ const DID = {
   adjust_home: () => "Calmed the room",
   speak_for_you: (d) => `Spoke for you${d.data.heard ? ` ("${d.data.heard}")` : ""}`,
   remember: () => "Saved this moment",
+  exercise: () => "Time for something to remember",
+  none: (d) => d.data.rules ? `Didn't ${d.data.blocked.replace(/_/g, " ")}, as you asked`
+    : d.data.blocked === "adjust_home" ? "No lights or speakers nearby" : "Waited",
 };
 
 // ---------- start (a tap unlocks vibration) ----------
@@ -172,9 +320,247 @@ function addLog(d) {
 function onDecision(d) {
   addLog(d);
   if (d.action === "vibrate") nudge();
-  if (d.action === "notify_phone") showBanner("Things are getting a lot. Timber is with you.");
+  if (d.action === "notify_phone") showBanner(BANNER);
+  if (d.action === "exercise") loadActivities();
+  if (d.action === "whisper" && d.data.text) {  // the calm voice: the same words every time
+    showBanner(d.data.text);
+    if ("speechSynthesis" in window) {
+      const u = new SpeechSynthesisUtterance(d.data.text); u.rate = 0.85; u.volume = 0.7;
+      speechSynthesis.speak(u);
+    }
+  }
   if (d.action === "notify_circle") $("note").textContent = `${(d.data.to || []).join(", ")} knows.`;
-  if (d.action === "remember") { $("banner").classList.remove("show"); $("note").textContent = "You're calm again."; }
+  if (d.action === "remember") {
+    $("banner").classList.remove("show"); $("note").textContent = "You're calm again.";
+    setTimeout(loadProgress, 2000); setTimeout(loadProgress, 45000);  // again once "what helped" is estimated
+  }
+}
+
+// ---------- speaking for you ----------
+try { $("speak-here").checked = localStorage.getItem("timber-speak-here") === "1"; } catch {}
+$("speak-here").onchange = () => { try { localStorage.setItem("timber-speak-here", $("speak-here").checked ? "1" : "0"); } catch {} };
+
+function onSay(msg) {
+  if ($("speak-here").checked && "speechSynthesis" in window) {
+    const u = new SpeechSynthesisUtterance(msg.text); u.rate = 0.95;
+    speechSynthesis.speak(u);  // utterances queue, so the opener plays first
+  }
+  $("said").hidden = false;
+  if (msg.part === "opener") {
+    $("said-text").textContent = msg.text;
+    $("said-receipts").textContent = `Replying to "${msg.heard}"…`;
+  } else {
+    $("said-text").textContent = msg.said;
+    $("said-receipts").textContent = "Proof: " + msg.sentences.slice(1).map((s) => s.receipt).join(" · ");
+  }
+}
+
+// ---------- the missing word ----------
+function remembered(id, key) {
+  try { $(id).checked = localStorage.getItem(key) === "1"; } catch {}
+  $(id).onchange = () => { try { localStorage.setItem(key, $(id).checked ? "1" : "0"); } catch {} };
+}
+remembered("say-word", "timber-say-word");  // off unless the person turns it on
+
+let wordTimer = null;
+function onWord(msg) {
+  $("word-best").textContent = msg.words[0];
+  $("word-more").textContent = msg.words.length > 1 ? `or ${msg.words.slice(1).join(" · ")}` : "";
+  $("word-heard").textContent = `You said: "${msg.heard}"`;
+  $("word").hidden = false;
+  if (!(started && navigator.vibrate?.(40))) {  // one short tap; no vibration: pulse the card
+    const card = $("word"); card.classList.remove("pulse"); void card.offsetWidth; card.classList.add("pulse");
+  }
+  if ($("say-word").checked && "speechSynthesis" in window) {
+    const u = new SpeechSynthesisUtterance(msg.words[0]); u.volume = 0.5; u.rate = 0.9;
+    speechSynthesis.speak(u);
+  }
+  clearTimeout(wordTimer);
+  wordTimer = setTimeout(() => ($("word").hidden = true), 20000);
+}
+$("word").onclick = () => ($("word").hidden = true);
+
+// ---------- my progress ----------
+const HELP_NAMES = {
+  vibrate: "Gentle vibration", whisper: "A calm word", notify_phone: "Phone alert",
+  adjust_home: "Calmer room", speak_for_you: "Timber speaking for me",
+};
+const mins = (m) => (m == null ? "–" : m < 1 ? "<1 min" : `${Math.round(m)} min`);
+const dayLabel = (iso, opts) => new Date(`${iso}T12:00:00`).toLocaleDateString([], opts);
+function make(tag, props = {}, ...kids) { const n = Object.assign(document.createElement(tag), props); n.append(...kids); return n; }
+
+function showChart(days) {
+  const max = Math.max(3, ...days.map((d) => d.episodes));
+  const plot = $("plot"), tip = $("tip"), today = days[days.length - 1].date;
+  for (const node of [plot, $("ticks")]) node.style.setProperty("--n", days.length);
+  plot.style.setProperty("--rows", max);
+  plot.setAttribute("aria-label", `Episodes per day, last ${days.length} days. A table is below.`);
+  plot.replaceChildren(...days.map((d) => {
+    const label = `${dayLabel(d.date, { weekday: "short", month: "short", day: "numeric" })}: ` +
+      (d.episodes ? `${d.episodes} episode${d.episodes === 1 ? "" : "s"}, about ${mins(d.avg_minutes)} each` : "no episodes");
+    const bar = make("div", { className: "bar", tabIndex: 0, ariaLabel: label },
+      make("span", { style: `height:${(d.episodes / max) * 100}%` }));
+    const show = () => {
+      tip.textContent = label; tip.style.display = "block";
+      const box = bar.getBoundingClientRect(), host = plot.closest(".progress").getBoundingClientRect();
+      tip.style.left = `${Math.min(Math.max(box.left - host.left + box.width / 2, 80), host.width - 80)}px`;
+      tip.style.top = `${box.bottom - host.top - box.height * (d.episodes / max)}px`;
+    };
+    const hide = () => (tip.style.display = "none");
+    bar.addEventListener("mouseenter", show); bar.addEventListener("focus", show);
+    bar.addEventListener("mouseleave", hide); bar.addEventListener("blur", hide);
+    return bar;
+  }));
+  $("ticks").replaceChildren(...days.map((d, i) => make("span", {
+    textContent: i % 2 === days.length % 2 || d.date === today ? dayLabel(d.date, { weekday: "narrow" }) : "",
+  })));
+  $("ptable").replaceChildren(
+    make("tr", {}, make("th", { textContent: "Day" }), make("th", { textContent: "Episodes" }), make("th", { textContent: "Average" })),
+    ...days.slice().reverse().map((d) => make("tr", {},
+      make("td", { textContent: dayLabel(d.date, { weekday: "short", month: "short", day: "numeric" }) }),
+      make("td", { textContent: d.episodes }), make("td", { textContent: d.episodes ? mins(d.avg_minutes) : "–" }))));
+}
+
+function showHelps(helps) {
+  if (!helps.length) { $("helps").replaceChildren(make("li", { className: "muted", textContent: "Nothing yet." })); return; }
+  $("helps").replaceChildren(...helps.map((h) => make("li", {},
+    make("div", { className: "name" },
+      make("span", { textContent: HELP_NAMES[h.action] || h.action }),
+      make("span", { textContent: `helped ${h.helped} of ${h.used} · ${mins(h.avg_minutes_when_used)} avg` })),
+    make("div", { className: "track", role: "img", ariaLabel: `helped in ${h.helped} of ${h.used} episodes` },
+      make("div", { className: "fill", style: `width:${(h.helped / h.used) * 100}%` })))));
+}
+
+async function loadProgress() {
+  try {
+    const p = await (await fetch("/api/progress")).json();
+    $("story").textContent = p.story.join(" ");
+    $("p-eps").textContent = p.this_week.episodes;
+    $("p-avg").textContent = mins(p.this_week.avg_minutes);
+    $("p-avg-label").textContent = p.last_week.avg_minutes == null
+      ? "average length" : `average length (last week ${mins(p.last_week.avg_minutes)})`;
+    showChart(p.days); showHelps(p.helps);
+  } catch { $("story").textContent = "Couldn't load your progress."; }
+}
+loadProgress();
+
+// ---------- memory: answers and orientation, each with its receipts ----------
+function showRemembers(title, text, receipts) {
+  $("rem-title").textContent = title;
+  $("rem-text").textContent = text;
+  $("rem-receipts").replaceChildren(...receipts.map((r) => make("li", { textContent: r })));
+  $("remembers").hidden = false;
+  if (document.body.dataset.mode === "dementia" && "speechSynthesis" in window) {  // a calm voice
+    const u = new SpeechSynthesisUtterance(text); u.rate = 0.85; speechSynthesis.speak(u);
+  } else if (started) navigator.vibrate?.(40);
+}
+function onAnswer(msg) {
+  showRemembers(`You asked: "${msg.question}"`, msg.answer, msg.sentences.flatMap((s) => s.receipts));
+}
+function onOrient(msg) {
+  showRemembers("Today", msg.text, msg.sentences.map((s) => s.receipt));
+}
+$("orient").onclick = () => fetch("/api/orientation", { method: "POST" });
+$("ask").onsubmit = async (e) => {
+  e.preventDefault();
+  const question = $("ask-text").value.trim();
+  if (question.length < 2) return;
+  $("note").textContent = "Looking through what Timber heard…";
+  try {
+    const r = await fetch("/api/memory/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question }) });
+    if (!r.ok) throw new Error(r.status);
+    $("ask-text").value = ""; $("note").textContent = "";
+  } catch { $("note").textContent = "Couldn't reach Timber. Try again."; }
+};
+
+// ---------- find it: photo -> SAM 3.1 box -> plain words ----------
+function shrink(file, max = 1024) {  // phone photos are huge; 1024 px is plenty for SAM
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src);
+      resolve(c.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}
+function showBox(box) {
+  const el = $("find-box");
+  if (!box) { el.hidden = true; return; }
+  const w = box.w || $("find-img").naturalWidth, h = box.h || $("find-img").naturalHeight;
+  Object.assign(el.style, { left: `${(box.x1 / w) * 100}%`, top: `${(box.y1 / h) * 100}%`,
+    width: `${((box.x2 - box.x1) / w) * 100}%`, height: `${((box.y2 - box.y1) / h) * 100}%` });
+  el.hidden = false;
+}
+$("find-photo").onchange = async () => {
+  const file = $("find-photo").files[0];
+  if (!file) return;
+  const question = $("find-q").value.trim() || "Where are my keys?";
+  $("find-answer").textContent = "Looking…"; $("find-receipt").textContent = ""; showBox(null);
+  try {
+    const image = await shrink(file);
+    $("find-img").src = image; $("find-shot").hidden = false;
+    const r = await fetch("/api/find", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question, image }) });
+    if (!r.ok) throw new Error(r.status);
+    const found = await r.json();
+    $("find-answer").textContent = found.answer;
+    $("find-receipt").textContent = `Proof: ${found.receipt}`;
+    showBox(found.box);
+    if (document.body.dataset.mode === "dementia" && "speechSynthesis" in window) {
+      const u = new SpeechSynthesisUtterance(found.answer); u.rate = 0.85; speechSynthesis.speak(u);
+    } else if (started) navigator.vibrate?.(40);
+  } catch { $("find-answer").textContent = "Couldn't look just now. Try again."; }
+  $("find-photo").value = "";
+};
+
+// ---------- coach: one gentle activity at a time ----------
+let activities = [];
+let spokenFor = null;  // say each activity once, not again when its picture arrives
+function speakSoft(text, id) {
+  if (id && id === spokenFor) return;
+  spokenFor = id || spokenFor;
+  if (document.body.dataset.mode === "dementia" && "speechSynthesis" in window) {
+    const u = new SpeechSynthesisUtterance(text); u.rate = 0.85; speechSynthesis.speak(u);
+  }
+}
+function showActivity() {
+  const a = activities[0];
+  if (!a) { $("activity").replaceChildren(make("p", { className: "muted", textContent: "All done for now. Well done." })); return; }
+  const answer = make("p", { className: "a", textContent: a.answer, hidden: !a.show_answer_first });
+  const from = make("p", { className: "from", textContent: a.from ? `From your memories, ${a.from}.` : "" });
+  const done = async (remembered) => {
+    await fetch(`/api/coach/${a.id}/result`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ remembered }) });
+    activities.shift(); showActivity();
+  };
+  const buttons = make("div", { className: "buttons" });
+  if (a.show_answer_first) {  // errorless: the answer comes with the question
+    buttons.append(make("button", { className: "main", textContent: "Got it", onclick: () => done(true) }));
+    speakSoft(`${a.question} ${a.answer}.`, a.id);
+  } else {
+    const yes = make("button", { className: "main", textContent: "Yes, I remember", onclick: () => { answer.hidden = false; speakSoft(a.answer); setTimeout(() => done(true), 2500); } });
+    const show = make("button", { textContent: "Show me", onclick: () => { answer.hidden = false; speakSoft(a.answer); buttons.replaceChildren(make("button", { className: "main", textContent: "Thank you", onclick: () => done(false) })); } });
+    buttons.append(yes, show);
+    speakSoft(a.question, a.id);
+  }
+  $("activity").replaceChildren(make("div", { className: "activity" },
+    a.card ? make("img", { src: a.card, alt: "" }) : "", make("p", { className: "q", textContent: a.question }), answer, from, buttons));
+}
+async function loadActivities() {
+  try { activities = (await (await fetch("/api/coach/today")).json()).activities; showActivity(); } catch {}
+}
+loadActivities();
+
+// ---------- mode: Autism or Dementia ----------
+function applyMode(mode) {
+  document.body.dataset.mode = mode.id;
+  WORDS = mode.words; BANNER = mode.banner;
+  $("mode-badge").textContent = mode.label;
+  $("break").textContent = mode.break_label;
 }
 
 // ---------- live feed ----------
@@ -184,8 +570,16 @@ function connect() {
   ws.onopen = () => { retry = 1000; $("conn").textContent = "Connected"; $("conn").classList.add("on"); };
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data);
-    if (msg.kind === "state") showLevel(msg.sense);
+    if (msg.kind === "state") { if (msg.mode) applyMode(msg.mode); showLevel(msg.sense); }
     if (msg.kind === "decision") onDecision(msg.decision);
+    if (msg.kind === "say") onSay(msg);
+    if (msg.kind === "word") onWord(msg);
+    if (msg.kind === "answer") onAnswer(msg);
+    if (msg.kind === "orient") onOrient(msg);
+    if (msg.kind === "card_ready") {  // a picture card finished painting
+      const a = activities.find((x) => x.id === msg.activity);
+      if (a && !a.card) { a.card = msg.card; if (activities[0] === a) showActivity(); }
+    }
   };
   ws.onclose = () => {
     $("conn").textContent = "Reconnecting…"; $("conn").classList.remove("on");

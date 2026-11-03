@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Timber Listening</title>
+<style>
+  :root {
+    --bg: #eef4f0; --card: #ffffff; --ink: #22302a; --muted: #66796f; --line: #d8e3dc;
+    --accent: #3f7d62; --accent-ink: #ffffff; --me: #dcefe4; --other: #ece8f6; --warn: #8a5a2b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141a17; --card: #1d2420; --ink: #e3ebe6; --muted: #9aaaa1; --line: #2c3530;
+      --accent: #78b89a; --accent-ink: #0f1512; --me: #1f3329; --other: #2a2738; --warn: #d9a66b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+  }
+  main { max-width: 640px; margin: 0 auto; display: grid; gap: 16px; }
+  h1 { font-size: 22px; margin: 0; }
+  .lede { margin: 4px 0 0; color: var(--muted); font-size: 15px; }
+  .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .start {
+    padding: 14px 22px; border-radius: 14px; border: 0; cursor: pointer;
+    background: var(--accent); color: var(--accent-ink); font: 600 17px/1 inherit;
+  }
+  .start.on { background: var(--card); color: var(--ink); box-shadow: inset 0 0 0 2px var(--accent); }
+  .status { color: var(--muted); font-size: 14px; }
+  .status.warn { color: var(--warn); }
+  .meter { width: 80px; height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+  .meter span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .1s linear; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; }
+  .card h2 { font-size: 14px; color: var(--muted); font-weight: 600; margin: 0 0 10px; }
+  .turns { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .turn { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; padding: 10px; border-radius: 12px; background: var(--other); }
+  .turn.me { background: var(--me); }
+  .turn.partial { opacity: .7; }
+  .who { display: grid; gap: 4px; justify-items: start; min-width: 88px; }
+  .label { font-weight: 600; font-size: 14px; }
+  .tag { font: 12px inherit; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
+  .text { margin: 0; }
+  .empty { color: var(--muted); font-style: italic; margin: 0; }
+  .note { color: var(--muted); font-size: 13px; }
+  .speak-toggle { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 15px; }
+  .speak-toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .turn.timber { background: var(--card); border: 1px dashed var(--accent); }
+  .receipt { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Listening</h1>
+    <p class="lede">Muse Voice Transcribe hears the conversation and tells voices apart. Tap "That's me" on your own voice once, so Timber knows who is talking to you.</p>
+  </header>
+
+  <div class="controls">
+    <button class="start" id="start">Start listening</button>
+    <div class="meter" aria-hidden="true"><span id="level"></span></div>
+    <span class="status" id="status" aria-live="polite">Not listening.</span>
+  </div>
+
+  <label class="speak-toggle"><input type="checkbox" id="speak-here" checked> Speak Timber's replies out loud from this computer</label>
+
+  <section class="card">
+    <h2 id="me-line">Who is who: not set yet</h2>
+    <ul class="turns" id="turns"><li class="empty">Nothing heard yet.</li></ul>
+  </section>
+
+  <p class="note">Audio goes to Timber on this computer, which relays it to Meta; your key never reaches the browser. The microphone needs this page on <code>localhost</code> or <code>https</code>.</p>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const CHUNK = 2400;  // 100 ms at 24 kHz
+const WORKLET = `class PcmTap extends AudioWorkletProcessor {
+  process(inputs) { const ch = inputs[0][0]; if (ch) this.port.postMessage(ch.slice(0)); return true; }
+}
+registerProcessor("pcm-tap", PcmTap);`;
+
+let ws = null, ctx = null, stream = null, me = null;
+const turns = new Map();  // turn id -> {label, text, partial}
+
+function status(text, warn = false) { $("status").textContent = text; $("status").className = `status${warn ? " warn" : ""}`; }
+
+// ---------- showing the conversation ----------
+function render() {
+  $("me-line").textContent = me ? `Who is who: you are speaker ${me}` : "Who is who: not set yet";
+  if (!turns.size) { $("turns").innerHTML = '<li class="empty">Nothing heard yet.</li>'; return; }
+  const items = [...turns.values()].slice(-12).map((t) => {  // a Map keeps arrival order
+    const isMe = me && t.label === me;
+    const li = document.createElement("li");
+    li.className = `turn${isMe ? " me" : ""}${t.partial ? " partial" : ""}${t.timber ? " timber" : ""}`;
+    const who = document.createElement("div"); who.className = "who";
+    const label = document.createElement("span"); label.className = "label";
+    label.textContent = t.timber ? "Timber" : t.partial && !t.label ? "…" : isMe ? "You" : `Speaker ${t.label || "?"}`;
+    who.append(label);
+    if (t.label && !isMe && !t.timber) {
+      const tag = document.createElement("button"); tag.className = "tag"; tag.textContent = "That's me";
+      tag.onclick = () => ws?.readyState === 1 && ws.send(JSON.stringify({ type: "me", label: t.label }));
+      who.append(tag);
+    }
+    const text = document.createElement("p"); text.className = "text"; text.textContent = t.text;
+    for (const r of t.receipts || []) {
+      const small = document.createElement("small"); small.className = "receipt"; small.textContent = `proof: ${r}`;
+      text.append(small);
+    }
+    li.append(who, text); return li;
+  });
+  $("turns").replaceChildren(...items);
+}
+
+function onMessage(msg) {
+  if (msg.kind === "status") {
+    status(msg.status === "ok" ? "Listening with Muse Voice Transcribe."
+      : msg.status === "demo" ? "Demo mode (no API key): you'll see a sample conversation."
+      : "Couldn't reach Meta; showing a sample conversation.", msg.status !== "ok");
+  }
+  if (msg.kind === "partial") { const t = turns.get(msg.turn) || {}; turns.set(msg.turn, { ...t, text: msg.text, partial: true }); }
+  if (msg.kind === "turn") turns.set(msg.turn, { label: msg.label, text: msg.text, partial: false });
+  if (msg.kind === "me") me = msg.label;
+  render();
+}
+
+// ---------- microphone -> 16-bit PCM -> websocket ----------
+async function start() {
+  if (!navigator.mediaDevices?.getUserMedia) { status("This browser can't use the microphone here (needs localhost or https).", true); return; }
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+  } catch (err) { status(`Microphone not allowed: ${err.message}`, true); return; }
+
+  ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/listen`);
+  ws.binaryType = "arraybuffer";
+  ws.onmessage = (e) => onMessage(JSON.parse(e.data));
+  ws.onclose = () => { if (ctx) { stop(); status("Connection closed.", true); } };
+  await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
+
+  ctx = new AudioContext({ sampleRate: 24000 });  // the browser resamples the mic for us
+  await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET], { type: "application/javascript" })));
+  const tap = new AudioWorkletNode(ctx, "pcm-tap");
+  const mute = ctx.createGain(); mute.gain.value = 0;  // keep the graph running without playing the mic back
+  ctx.createMediaStreamSource(stream).connect(tap).connect(mute).connect(ctx.destination);
+
+  let pending = new Float32Array(0);
+  tap.port.onmessage = ({ data }) => {
+    const joined = new Float32Array(pending.length + data.length);
+    joined.set(pending); joined.set(data, pending.length); pending = joined;
+    while (pending.length >= CHUNK) {
+      const chunk = pending.subarray(0, CHUNK); pending = pending.slice(CHUNK);
+      const pcm = new Int16Array(CHUNK);
+      let peak = 0;
+      for (let i = 0; i < CHUNK; i++) {
+        const s = Math.max(-1, Math.min(1, chunk[i]));
+        pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+        peak = Math.max(peak, Math.abs(s));
+      }
+      $("level").style.width = `${Math.min(100, peak * 140)}%`;
+      if (ws.readyState === 1) ws.send(pcm.buffer);
+    }
+  };
+  $("start").textContent = "Stop listening"; $("start").classList.add("on");
+  status("Connecting to Meta…");
+}
+
+function stop() {
+  stream?.getTracks().forEach((t) => t.stop());
+  ctx?.close(); ctx = null; stream = null;
+  if (ws && ws.readyState <= 1) ws.close();
+  ws = null;
+  $("level").style.width = "0";
+  $("start").textContent = "Start listening"; $("start").classList.remove("on");
+  status("Not listening.");
+}
+
+// ---------- Timber's replies (from the Mind's feed) ----------
+function onSay(msg) {
+  if ($("speak-here").checked && "speechSynthesis" in window) {
+    const u = new SpeechSynthesisUtterance(msg.text); u.rate = 0.95;
+    speechSynthesis.speak(u);  // utterances queue, so the opener plays first
+  }
+  const key = `timber:${msg.episode}:${msg.heard}`;
+  turns.set(key, msg.part === "opener"
+    ? { timber: true, text: msg.text, partial: true }
+    : { timber: true, text: msg.said, receipts: msg.sentences.slice(1).map((s) => s.receipt) });
+  render();
+}
+(function follow(retry = 1000) {
+  const feed = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/person`);
+  feed.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.kind === "say") onSay(msg);
+    if (msg.kind === "answer" || msg.kind === "orient") {  // shown here; the phone says it
+      turns.set(`${msg.kind}:${msg.t}`, { timber: true, text: msg.kind === "answer" ? msg.answer : msg.text,
+        receipts: msg.kind === "answer" ? msg.sentences.flatMap((s) => s.receipts) : msg.sentences.map((s) => s.receipt) });
+      render();
+    }
+    if (msg.kind === "found") {
+      turns.set(`found:${msg.t}`, { timber: true, text: msg.answer, receipts: [msg.receipt] });
+      render();
+    }
+    if (msg.kind === "word") {  // shown, never spoken here: the word is only for the person
+      turns.set(`word:${msg.turn}:${msg.t}`, { timber: true, text: `Offered on the phone: ${msg.words.join(" · ")}` });
+      render();
+    }
+  };
+  feed.onopen = () => (retry = 1000);
+  feed.onclose = () => setTimeout(() => follow(Math.min(retry * 2, 10000)), retry);
+})();
+
+$("start").onclick = () => (ctx ? stop() : start().catch((err) => { stop(); status(`Couldn't start: ${err.message || err}`, true); }));
+</script>
+</body>
+</html>

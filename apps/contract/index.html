@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Calm-Self Contract</title>
+<style>
+  :root {
+    --bg: #eef4f0; --card: #ffffff; --ink: #22302a; --muted: #66796f; --line: #d8e3dc;
+    --accent: #3f7d62; --accent-ink: #ffffff; --chip: #e6efe9; --warn: #8a5a2b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141a17; --card: #1d2420; --ink: #e3ebe6; --muted: #9aaaa1; --line: #2c3530;
+      --accent: #78b89a; --accent-ink: #0f1512; --chip: #26302a; --warn: #d9a66b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 17px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+  }
+  main { max-width: 640px; margin: 0 auto; display: grid; gap: 20px; }
+  h1 { font-size: 24px; margin: 0; }
+  .lede { margin: 4px 0 0; color: var(--muted); }
+
+  .write { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px; display: grid; gap: 12px; }
+  .write label { font-weight: 600; }
+  textarea {
+    width: 100%; min-height: 96px; resize: vertical; padding: 12px; border-radius: 12px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit;
+  }
+  textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  .starters { display: flex; flex-wrap: wrap; gap: 8px; }
+  .starters button, .chip {
+    font: 14px/1.2 inherit; padding: 6px 10px; border-radius: 999px; border: 0; background: var(--chip); color: var(--ink);
+  }
+  .starters button { cursor: pointer; }
+  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .add {
+    padding: 12px 20px; border-radius: 12px; border: 0; cursor: pointer;
+    background: var(--accent); color: var(--accent-ink); font: 600 17px/1 inherit;
+  }
+  .add:disabled { opacity: .6; cursor: wait; }
+  .status { color: var(--muted); font-size: 15px; }
+  .status.warn { color: var(--warn); }
+
+  section.kind h2 { font-size: 18px; margin: 0 0 4px; }
+  section.kind > p { margin: 0 0 10px; color: var(--muted); font-size: 15px; }
+  ul.rules { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .rule { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; gap: 8px; }
+  .rule.new { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); }
+  .rule .top { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+  .rule strong { font-weight: 600; }
+  .rule .source { color: var(--muted); font-size: 14px; margin: 0; }
+  .rule .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .remove { background: none; border: 0; color: var(--muted); cursor: pointer; font: 14px inherit; padding: 2px 4px; }
+  .remove:hover { color: var(--ink); text-decoration: underline; }
+  .empty { color: var(--muted); font-size: 15px; font-style: italic; }
+
+  .review { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px; display: grid; gap: 12px; }
+  .review h2 { font-size: 18px; margin: 0; }
+  .review .summary { margin: 0; }
+  .review .meta { color: var(--muted); font-size: 14px; margin: 0; }
+  .proposal { border: 2px solid var(--accent); border-radius: 14px; padding: 14px; display: grid; gap: 8px; }
+  .proposal .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .proposal .why { color: var(--muted); font-size: 15px; margin: 0; }
+  .proposal .buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+  .yes { padding: 10px 16px; border-radius: 10px; border: 0; cursor: pointer; background: var(--accent); color: var(--accent-ink); font: 600 16px/1 inherit; }
+  .no { padding: 10px 16px; border-radius: 10px; border: 1px solid var(--line); cursor: pointer; background: none; color: var(--ink); font: 16px/1 inherit; }
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .mode-btn { text-align: left; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; font: inherit; }
+  .mode-btn strong { display: block; font-size: 17px; }
+  .mode-btn span { color: var(--muted); font-size: 14px; }
+  .mode-btn[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+  .ghost { justify-self: start; padding: 10px 16px; border-radius: 10px; border: 1px solid var(--accent); cursor: pointer; background: none; color: var(--ink); font: 600 15px/1 inherit; }
+  .ghost:disabled { opacity: .6; cursor: wait; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>My Calm-Self Contract</h1>
+    <p class="lede">Write these while you're calm. When you can't answer, Timber follows them instead of asking you.</p>
+  </header>
+
+  <section class="review">
+    <h2>Mode</h2>
+    <div class="modes" role="group" aria-label="Mode">
+      <button class="mode-btn" data-mode="autism" aria-pressed="false"><strong>Autism mode</strong>
+        <span>A gentle vibration first. Speaks for you when your words switch off.</span></button>
+      <button class="mode-btn" data-mode="dementia" aria-pressed="false"><strong>Dementia mode</strong>
+        <span>A calm voice first. Bigger, simpler screens. Helps find words and remember.</span></button>
+    </div>
+    <p class="meta" id="mode-meta"></p>
+  </section>
+
+  <section class="review" aria-live="polite">
+    <h2>Timber's nightly review</h2>
+    <p class="meta" id="review-meta">Each night Muse Wonder looks back over your day and suggests changes. Nothing changes until you say yes.</p>
+    <p class="summary" id="review-summary" hidden></p>
+    <div id="proposals"></div>
+    <button class="ghost" id="reflect">Run tonight's review now</button>
+  </section>
+
+  <section class="write">
+    <label for="text">Write a rule in your own words</label>
+    <div class="starters" id="starters">
+      <button data-text="Timber may say ">May say…</button>
+      <button data-text="Never tell strangers ">Never say…</button>
+      <button data-text="When I'm overloaded, text ">Contact…</button>
+      <button data-text="It helps me when ">What helps…</button>
+      <button data-text="Don't ">Avoid…</button>
+    </div>
+    <textarea id="text" placeholder="e.g. Never tell strangers I'm autistic."></textarea>
+    <div class="row">
+      <button class="add" id="add">Add to my contract</button>
+      <span class="status" id="status" aria-live="polite"></span>
+    </div>
+  </section>
+
+  <div id="kinds"></div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const KINDS = [
+  ["may_say", "Timber may say", "Things Timber may say for you."],
+  ["never_say", "Timber must never say", "Words and facts Timber keeps private."],
+  ["contact", "Who to contact", "Who Timber tells, and when."],
+  ["helps", "What helps", "What Timber should reach for first."],
+  ["avoid", "What to avoid", "Things Timber must not do."],
+];
+const ACTION_NAMES = {
+  vibrate: "vibration", whisper: "voice in ear", notify_phone: "phone alert", notify_circle: "tell care circle",
+  adjust_home: "change the room", speak_for_you: "speak for me",
+};
+let fresh = new Set();
+
+function el(tag, props = {}, ...children) {
+  const node = Object.assign(document.createElement(tag), props);
+  node.append(...children.filter(Boolean));
+  return node;
+}
+const chip = (text) => el("span", { className: "chip", textContent: text });
+
+function ruleCard(rule) {
+  const chips = [];
+  if (rule.mode && rule.mode !== "any") chips.push(chip(`${rule.mode} mode only`));
+  if (rule.audience && rule.audience !== "anyone") chips.push(chip(`for: ${rule.audience}`));
+  for (const a of rule.actions) chips.push(chip(ACTION_NAMES[a] || a));
+  for (const w of rule.words) chips.push(chip(`never: "${w}"`));
+  if (rule.contact) {
+    const c = rule.contact;
+    chips.push(chip(`${c.name}${c.relation && c.relation !== c.name ? ` (${c.relation})` : ""}`));
+    chips.push(chip(`by ${c.how}`), chip(c.when === "any" ? "any time" : `from: ${c.when}`));
+  }
+  const remove = el("button", { className: "remove", textContent: "Remove" });
+  remove.onclick = async () => {
+    if (!confirm(`Remove this rule?\n\n${rule.statement}`)) return;
+    const r = await fetch(`/api/contract/rules/${rule.id}`, { method: "DELETE" });
+    if (r.ok) load();
+  };
+  return el("li", { className: `rule${fresh.has(rule.id) ? " new" : ""}` },
+    el("div", { className: "top" }, el("strong", { textContent: rule.statement }), remove),
+    el("p", { className: "source", textContent: `Your words: "${rule.source}"` }),
+    chips.length ? el("div", { className: "chips" }, ...chips) : null,
+  );
+}
+
+function render(contract) {
+  $("kinds").replaceChildren(...KINDS.map(([kind, title, blurb]) => {
+    const rules = contract.rules.filter((r) => r.kind === kind);
+    const list = rules.length
+      ? el("ul", { className: "rules" }, ...rules.map(ruleCard))
+      : el("p", { className: "empty", textContent: "Nothing here yet." });
+    return el("section", { className: "kind" }, el("h2", { textContent: title }), el("p", { textContent: blurb }), list);
+  }));
+}
+
+async function load() {
+  try { render(await (await fetch("/api/contract")).json()); }
+  catch { $("status").textContent = "Couldn't reach Timber."; }
+}
+
+async function add() {
+  const text = $("text").value.trim();
+  if (text.length < 3) { $("text").focus(); return; }
+  $("add").disabled = true;
+  $("status").className = "status";
+  $("status").textContent = "Muse Spark is reading your words…";
+  try {
+    const r = await fetch("/api/contract/rules", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }),
+    });
+    const body = await r.json();
+    if (!r.ok) throw new Error(body.detail || r.status);
+    fresh = new Set(body.added.map((rule) => rule.id));
+    const n = body.added.length;
+    if (body.status === "ok") {
+      $("status").textContent = `Added ${n} rule${n === 1 ? "" : "s"}, structured by Muse Spark.`;
+    } else {
+      $("status").className = "status warn";
+      $("status").textContent = `Added ${n} rule${n === 1 ? "" : "s"} (Muse Spark unavailable, so this is a rough guess: check it).`;
+    }
+    $("text").value = "";
+    await load();
+  } catch (err) {
+    $("status").className = "status warn";
+    $("status").textContent = String(err.message || err);
+  } finally {
+    $("add").disabled = false;
+  }
+}
+
+// ---------- nightly review: suggestions wait here for a yes ----------
+const KIND_WORDS = { helps: "Add to What helps", avoid: "Add to What to avoid" };
+let polling = null;
+
+function proposalCard(p) {
+  const title = p.change === "remove" ? `Remove: "${p.rule.statement}"` : p.rule.statement;
+  const yes = el("button", { className: "yes", textContent: p.change === "remove" ? "Yes, remove it" : "Yes, add it" });
+  const no = el("button", { className: "no", textContent: "No thanks" });
+  const decide = async (verdict) => {
+    yes.disabled = no.disabled = true;
+    const r = await fetch(`/api/proposals/${p.id}/${verdict}`, { method: "POST" });
+    if (r.ok) { await loadReview(); await load(); }
+  };
+  yes.onclick = () => decide("approve"); no.onclick = () => decide("decline");
+  return el("div", { className: "proposal" },
+    el("strong", { textContent: title }),
+    el("p", { className: "why", textContent: `Why: ${p.why}` }),
+    el("div", { className: "chips" },
+      chip(p.change === "remove" ? "change: remove a rule" : KIND_WORDS[p.rule.kind] || p.rule.kind),
+      ...(p.rule.actions || []).map((a) => chip(ACTION_NAMES[a] || a)),
+      chip(`from ${p.evidence.length} episode${p.evidence.length === 1 ? "" : "s"}`)),
+    el("div", { className: "buttons" }, yes, no));
+}
+
+async function loadReview() {
+  let body;
+  try { body = await (await fetch("/api/reflections/latest")).json(); } catch { return; }
+  const r = body.reflection;
+  if (r) {
+    const when = new Date(r.t * 1000).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
+    $("review-summary").hidden = false;
+    $("review-summary").textContent = r.summary;
+    $("review-meta").textContent = r.status === "ok"
+      ? `Reviewed by Muse Wonder (${when}, ${Math.round(r.ms / 1000)} s).`
+      : `Muse Wonder unavailable, so this is a simple count (${when}).`;
+  }
+  $("proposals").replaceChildren(...(body.proposals.length
+    ? body.proposals.map(proposalCard)
+    : [el("p", { className: "empty", textContent: r ? "No suggestions waiting." : "No review yet." })]));
+  $("reflect").disabled = body.running;
+  $("reflect").textContent = body.running ? "Muse Wonder is reviewing your day…" : "Run tonight's review now";
+  clearTimeout(polling);
+  if (body.running) polling = setTimeout(loadReview, 3000);
+}
+
+$("reflect").onclick = async () => {
+  $("reflect").disabled = true;
+  await fetch("/api/reflect", { method: "POST" });
+  loadReview();
+};
+loadReview();
+
+// ---------- mode switch ----------
+function showMode(mode) {
+  for (const b of document.querySelectorAll(".mode-btn")) b.setAttribute("aria-pressed", String(b.dataset.mode === mode.id));
+  $("mode-meta").textContent = `Leading: ${mode.leads.join(", ")}. First touch: ${mode.first_touch === "vibrate" ? "a vibration" : "a calm voice"}. Tone: ${mode.tone}`;
+}
+for (const b of document.querySelectorAll(".mode-btn")) {
+  b.onclick = async () => {
+    const r = await fetch("/api/mode", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: b.dataset.mode }) });
+    if (r.ok) { showMode((await r.json()).mode); load(); }
+  };
+}
+fetch("/api/mode").then((r) => r.json()).then((b) => showMode(b.mode)).catch(() => {});
+
+$("add").onclick = add;
+$("text").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) add(); });
+$("starters").addEventListener("click", (e) => {
+  if (e.target.dataset.text === undefined) return;
+  $("text").value = e.target.dataset.text; $("text").focus();
+});
+load();
+</script>
+</body>
+</html>
