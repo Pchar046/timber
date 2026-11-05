@@ -1,6 +1,6 @@
 # Timber
 
-**A no-touch second brain for autistic adults and people living with dementia.** It notices when things are getting too much, steps in gently, speaks for you when your words switch off, remembers what really happened, and keeps your trusted people in the loop. It does all of that on rules you wrote while calm, so it never needs you to confirm anything in the hard moment.
+**A no touch second brain for autistic adults and people living with dementia.** It notices when things are getting too much, steps in gently, speaks for you when your words switch off, remembers what really happened, and keeps your trusted people in the loop. It does all of that on rules you wrote while calm, so it never needs you to confirm anything in the hard moment.
 
 Built by Patrick Charles for the **Meta Global AI Developer Hackathon** (Indie Developer · Build for Your World).
 
