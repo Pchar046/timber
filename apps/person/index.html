@@ -3,21 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#eef4f0">
+<meta name="theme-color" content="#f1e4d3">
 <title>Timber</title>
 <style>
   :root {
-    --bg: #eef4f0; --card: #ffffff; --ink: #22302a; --muted: #66796f; --line: #d8e3dc;
-    --accent: #3f7d62; --accent-ink: #ffffff; --grid: #e6ede8;
-    --calm: #d9eee2; --rising: #f4e9cf; --overloaded: #e2dcf1;
-    --banner: #fff6df; --banner-line: #ecd9a6;
+    --bg: #f1e4d3; --card: #fbf5ec; --ink: #2a2520; --muted: #6b5d52; --line: #e3d0ba; --grid: #ecdcc8; --accent: #1f4a3c; --accent-ink: #f8f1e6; --calm: #e4efdc; --rising: #fbefd2; --overloaded: #ece3f7; --banner: #fdf1bf; --banner-line: #e8c45a;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #141a17; --card: #1d2420; --ink: #e3ebe6; --muted: #9aaaa1; --line: #2c3530;
-      --accent: #78b89a; --accent-ink: #0f1512; --grid: #27302b;
-      --calm: #1f3329; --rising: #3a3320; --overloaded: #2c2840;
-      --banner: #322b18; --banner-line: #574a24;
+      --bg: #1d1915; --card: #27221d; --ink: #f1e8dc; --muted: #ab9c8d; --line: #3a332b; --grid: #332c25; --accent: #8fcfa6; --accent-ink: #14201a; --calm: #24331f; --rising: #3b3020; --overloaded: #2f2740; --banner: #3b3220; --banner-line: #6b5a2a;
     }
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -64,7 +58,7 @@
 
   .break {
     width: 100%; min-height: 120px; border: 0; border-radius: 24px; cursor: pointer;
-    background: var(--accent); color: var(--accent-ink); font: 600 26px/1.2 inherit;
+    background: var(--accent); color: var(--accent-ink); font: 600 26px/1.2 system-ui, -apple-system, "Segoe UI", sans-serif;
   }
   .break:active { transform: scale(.98); }
   .words {
@@ -130,7 +124,7 @@
   .remembers ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
   .ask { display: flex; gap: 8px; }
   .ask input { flex: 1; min-width: 0; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit; }
-  .ask button, .orient-btn { padding: 12px 16px; border-radius: 12px; border: 1px solid var(--accent); background: var(--card); color: var(--ink); font: 600 16px/1.2 inherit; cursor: pointer; }
+  .ask button, .orient-btn { padding: 12px 16px; border-radius: 12px; border: 1px solid var(--accent); background: var(--card); color: var(--ink); font: 600 16px/1.2 system-ui, -apple-system, "Segoe UI", sans-serif; cursor: pointer; }
   .orient-btn { width: 100%; }
   .find { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; display: grid; gap: 10px; }
   .find h2 { font-size: 14px; color: var(--muted); font-weight: 600; margin: 0; }
@@ -152,7 +146,7 @@
   .activity .a { font-size: 22px; margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--calm); }
   .activity .from { color: var(--muted); font-size: 14px; margin: 0; }
   .activity .buttons { display: flex; gap: 10px; flex-wrap: wrap; }
-  .activity button { flex: 1; padding: 14px; border-radius: 14px; font: 600 18px/1.2 inherit; cursor: pointer; border: 1px solid var(--accent); background: var(--card); color: var(--ink); }
+  .activity button { flex: 1; padding: 14px; border-radius: 14px; font: 600 18px/1.2 system-ui, -apple-system, "Segoe UI", sans-serif; cursor: pointer; border: 1px solid var(--accent); background: var(--card); color: var(--ink); }
   .activity button.main { background: var(--accent); color: var(--accent-ink); border: 0; }
   .dementia-only { display: none; }
   body[data-mode="dementia"] .dementia-only { display: block; }
@@ -164,6 +158,12 @@
   .start p { color: var(--muted); }
   .start strong { font-size: 24px; }
   .start[hidden] { display: none; }
+
+  header h1 { text-transform: uppercase; letter-spacing: .26em; font-weight: 800; font-size: 18px; }
+  section.log h2, .progress h2, .find h2, .activities h2, .remembers h2, .word-card h2 {
+    font: 700 11px/1.3 ui-monospace, "Cascadia Mono", Consolas, monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--ink); }
+  section.log, .progress, .find, .activities { box-shadow: 0 2px 6px -3px #6b4f3033; }
+  [hidden] { display: none !important; }
 </style>
 </head>
 <body data-level="calm">

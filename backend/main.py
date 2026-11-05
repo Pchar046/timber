@@ -22,6 +22,7 @@ from .core import db, profile
 from .core.api import router as core_router
 from .core.events import bus
 from .core.state import state
+from .demo import router as demo_router
 from .devices.gateway import router as devices_router
 from .devices.home import home
 from .devices.listen import router as listen_router
@@ -63,6 +64,7 @@ app.include_router(listen_router)
 app.include_router(agents_router)
 app.include_router(agents_ws_router)
 app.include_router(models_router)
+app.include_router(demo_router)
 
 APPS_DIR = Path(__file__).resolve().parents[1] / "apps"
 app.mount("/person", StaticFiles(directory=APPS_DIR / "person", html=True), name="person")
@@ -70,6 +72,7 @@ app.mount("/contract", StaticFiles(directory=APPS_DIR / "contract", html=True), 
 app.mount("/circle", StaticFiles(directory=APPS_DIR / "circle", html=True), name="circle")
 app.mount("/listen", StaticFiles(directory=APPS_DIR / "listen", html=True), name="listen")
 app.mount("/watch", StaticFiles(directory=APPS_DIR / "watch", html=True), name="watch")
+app.mount("/console", StaticFiles(directory=APPS_DIR / "console", html=True), name="console")
 
 
 @app.get("/health")

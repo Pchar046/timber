@@ -23,6 +23,7 @@ log = logging.getLogger(__name__)
 LEVELS = ("calm", "rising", "overloaded")
 MUSE_EVERY_S = 15
 STALE_S = 30  # readings older than this don't count
+MUSE_MAX_AGE_S = 20  # a judgement about readings older than this no longer counts
 
 # Rule score: heart rate and noise earn 0-3 points each, plus 1 for climbing (any
 # signal) and 1 for restless movement. Total >= 2 is rising, >= 5 overloaded.
@@ -103,7 +104,8 @@ def _muse_input(snapshot: dict, rule: dict) -> str:
 
 async def ask_muse(snapshot: dict, rule: dict) -> dict:
     fallback = {"level": rule["level"], "confidence": 0.7, "reason": rule["reason"]}
-    out = await spark.ask_json("sense: judge load", SYSTEM, _muse_input(snapshot, rule), fallback)
+    out = await spark.ask_json("sense: judge load", SYSTEM, _muse_input(snapshot, rule), fallback,
+                               reasoning_effort="minimal", timeout=20)
     if out.get("level") not in LEVELS:
         out = {**out, **fallback}
     try:
@@ -160,7 +162,8 @@ class Sense:
     def assess(self) -> dict:
         snapshot = state.snapshot()
         rule = rule_assess(snapshot)
-        muse = self._muse if self._muse and self._muse["rule_level"] == rule["level"] else None
+        fresh = self._muse and time.time() - self._muse["asked_t"] <= MUSE_MAX_AGE_S
+        muse = self._muse if fresh and self._muse["rule_level"] == rule["level"] else None
         due = muse is None or time.time() - self._muse_t >= MUSE_EVERY_S
         if due and (self._task is None or self._task.done()):
             self._task = asyncio.create_task(self._refresh(snapshot, rule))
@@ -173,8 +176,9 @@ class Sense:
         return result
 
     async def _refresh(self, snapshot: dict, rule: dict) -> None:
+        asked = time.time()
         try:
-            self._muse = {**await ask_muse(snapshot, rule), "rule_level": rule["level"]}
+            self._muse = {**await ask_muse(snapshot, rule), "rule_level": rule["level"], "asked_t": asked}
             self._muse_t = time.time()
             if self.on_refresh is not None:
                 await self.on_refresh()

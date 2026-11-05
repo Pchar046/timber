@@ -6,13 +6,11 @@
 <title>Timber Listening</title>
 <style>
   :root {
-    --bg: #eef4f0; --card: #ffffff; --ink: #22302a; --muted: #66796f; --line: #d8e3dc;
-    --accent: #3f7d62; --accent-ink: #ffffff; --me: #dcefe4; --other: #ece8f6; --warn: #8a5a2b;
+    --bg: #f1e4d3; --card: #fbf5ec; --ink: #2a2520; --muted: #6b5d52; --line: #e3d0ba; --accent: #1f4a3c; --accent-ink: #f8f1e6; --warn: #8f5410; --me: #e4efdc; --other: #efe3d3;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #141a17; --card: #1d2420; --ink: #e3ebe6; --muted: #9aaaa1; --line: #2c3530;
-      --accent: #78b89a; --accent-ink: #0f1512; --me: #1f3329; --other: #2a2738; --warn: #d9a66b;
+      --bg: #1d1915; --card: #27221d; --ink: #f1e8dc; --muted: #ab9c8d; --line: #3a332b; --accent: #8fcfa6; --accent-ink: #14201a; --warn: #e0a96b; --me: #24331f; --other: #332c25;
     }
   }
   * { box-sizing: border-box; }
@@ -27,7 +25,7 @@
   .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
   .start {
     padding: 14px 22px; border-radius: 14px; border: 0; cursor: pointer;
-    background: var(--accent); color: var(--accent-ink); font: 600 17px/1 inherit;
+    background: var(--accent); color: var(--accent-ink); font: 600 17px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
   }
   .start.on { background: var(--card); color: var(--ink); box-shadow: inset 0 0 0 2px var(--accent); }
   .status { color: var(--muted); font-size: 14px; }
@@ -43,7 +41,7 @@
   .turn.partial { opacity: .7; }
   .who { display: grid; gap: 4px; justify-items: start; min-width: 88px; }
   .label { font-weight: 600; font-size: 14px; }
-  .tag { font: 12px inherit; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
+  .tag { font: 12px system-ui, -apple-system, "Segoe UI", sans-serif; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
   .text { margin: 0; }
   .empty { color: var(--muted); font-style: italic; margin: 0; }
   .note { color: var(--muted); font-size: 13px; }
@@ -51,6 +49,10 @@
   .speak-toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
   .turn.timber { background: var(--card); border: 1px dashed var(--accent); }
   .receipt { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+  .card h2 { font: 700 11px/1.3 ui-monospace, "Cascadia Mono", Consolas, monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--ink); }
+  .card { box-shadow: 0 2px 6px -3px #6b4f3033; }
+  [hidden] { display: none !important; }
 </style>
 </head>
 <body>

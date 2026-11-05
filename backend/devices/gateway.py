@@ -92,13 +92,13 @@ class DeviceIn(BaseModel):
 
 
 @router.get("/")
-def list_devices() -> dict:
+async def list_devices() -> dict:
     """Devices present now, their state, and what they've been doing."""
     return home.snapshot()
 
 
 @router.post("/register")
-def register_device(body: DeviceIn) -> Device:
+async def register_device(body: DeviceIn) -> Device:
     actions = body.actions or KIND_ACTIONS.get(body.kind.lower())
     if not actions:
         raise HTTPException(422, f"Unknown kind '{body.kind}': say which actions it offers.")
@@ -109,13 +109,13 @@ def register_device(body: DeviceIn) -> Device:
 
 
 @router.delete("/{device_id}")
-def remove_device(device_id: str) -> dict:
+async def remove_device(device_id: str) -> dict:
     if not home.remove(device_id):
         raise HTTPException(404, "No device with that id.")
     return {"removed": device_id}
 
 
 @router.get("/search")
-def search_devices(q: str) -> list[str]:
+async def search_devices(q: str) -> list[str]:
     """Tool search, as the agents see it: device ids matching `q`."""
     return [d.id for d in home.search(q)]

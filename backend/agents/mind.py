@@ -42,6 +42,7 @@ AGENT_FOR: dict[str, str] = {
 CLIMB_POINTS = 2       # score rise since the episode began that counts as "still climbing"
 SPEECH_SILENCE_S = 10  # no words from the person this long while overloaded = speech off
 CALM_READINGS = 3      # consecutive calm assessments that end an episode
+REOPEN_S = 60          # just after calming down, only the readings themselves can start a new episode
 
 
 class Decision(BaseModel):
@@ -96,6 +97,7 @@ class Mind:
     def __init__(self) -> None:
         self.decisions: deque[Decision] = deque(maxlen=500)
         self.episode: Episode | None = None
+        self._ended_t = 0.0
         self.feed = Feed("mind")  # state + decisions, for the apps and the Guardian
         sense.on_refresh = self.on_sense_refresh
 
@@ -186,6 +188,7 @@ class Mind:
              json.dumps(ep.actions), json.dumps(ep.peaks)),
         )
         self.episode = None
+        self._ended_t = end
 
     async def on_readings(self) -> None:
         self._ladder(sense.assess(), new_readings=True)
@@ -204,6 +207,8 @@ class Mind:
         if ep is None:
             if level == "calm":
                 return
+            if result["rule"]["level"] == "calm" and now - self._ended_t < REOPEN_S:
+                return  # Muse still sees the last episode in the history; the readings say calm
             ep = self._start_episode(level, score, f"Load is {level}: {why}.", trigger="sense")
 
         if level == "calm":

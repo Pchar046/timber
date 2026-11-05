@@ -21,6 +21,8 @@ from typing import Any, Literal
 import httpx
 from pydantic import BaseModel, Field
 
+from ..core.feed import Feed
+
 log = logging.getLogger(__name__)
 
 HA_URL = os.getenv("HA_URL", "").rstrip("/")
@@ -110,6 +112,7 @@ class Home:
     def __init__(self) -> None:
         self.devices: dict[str, Device] = {}
         self.log: deque[dict] = deque(maxlen=100)
+        self.feed = Feed("home")  # every join, leave and action, live (the console draws it)
 
     # ---------- coming and going ----------
     def register(self, device: Device) -> Device:
@@ -194,7 +197,7 @@ class Home:
         before = dict(device.state)
         _apply(device, action.name, clean)
         detail = f"{device.name}: {action.name.replace('_', ' ')} {clean or ''}".strip()
-        self._log(device, "action", detail)
+        self._log(device, "action", detail, action=action.name, args=clean)
         if device.entity_id and HA_URL and HA_TOKEN and action.name in HA_SERVICES:
             asyncio.get_running_loop().create_task(self._send_ha(device, action.name, clean))
         return {"ok": True, "tool": tool, "device": device.name, "action": action.name,
@@ -214,8 +217,11 @@ class Home:
         except Exception as exc:
             self._log(device, "error", f"Home Assistant failed: {str(exc)[:120]}")
 
-    def _log(self, device: Device, kind: str, detail: str) -> None:
-        self.log.append({"t": time.time(), "device": device.id, "kind": kind, "detail": detail})
+    def _log(self, device: Device, kind: str, detail: str, **extra: Any) -> None:
+        entry = {"t": time.time(), "device": device.id, "kind": kind, "detail": detail, **extra}
+        self.log.append(entry)
+        self.feed.publish({"kind": "device", "entry": entry,
+                           "devices": [d.model_dump() for d in self.devices.values()]})
 
     def snapshot(self) -> dict:
         return {

@@ -148,7 +148,7 @@ def card(name: str) -> FileResponse:
 
 
 @router.get("/orientation")
-def preview_orientation() -> dict:
+async def preview_orientation() -> dict:
     return memory_store.orientation()
 
 

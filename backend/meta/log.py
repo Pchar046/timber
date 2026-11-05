@@ -4,7 +4,10 @@
 import time
 from collections import deque
 
+from ..core.feed import Feed
+
 _entries: deque[dict] = deque(maxlen=500)
+feed = Feed("models")  # each call as it lands, for the console
 
 
 def record(model: str, task: str, ms: float, status: str, error: str | None = None) -> dict:
@@ -13,6 +16,7 @@ def record(model: str, task: str, ms: float, status: str, error: str | None = No
     if error:
         entry["error"] = error
     _entries.append(entry)
+    feed.publish({"kind": "model", "entry": entry})
     return entry
 
 

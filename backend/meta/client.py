@@ -4,6 +4,7 @@ The API key is read from the environment (.env) and only ever sent to Meta.
 With no key, every client returns its demo fallback so the app still runs.
 """
 
+import asyncio
 import os
 import time
 from collections.abc import Awaitable, Callable
@@ -44,14 +45,26 @@ async def aclose() -> None:
         await _http.aclose()
 
 
+RETRY_STATUS = (429, 502, 503)  # busy or rate-limited: worth another try
+RETRY_WAITS = (0.8, 2.0)
+
+
 async def post(path: str, payload: dict, timeout: float = 30) -> dict:
-    """POST JSON to the Meta Model API and return the parsed reply."""
-    resp = await http().post(
-        path,
-        json=payload,
-        headers={"Authorization": f"Bearer {api_key()}"},
-        timeout=timeout,
-    )
+    """POST JSON to the Meta Model API and return the parsed reply.
+
+    A busy or rate-limited answer is retried twice after a short pause; anything
+    else fails straight away so the caller's fallback can take over.
+    """
+    for wait in (*RETRY_WAITS, None):
+        resp = await http().post(
+            path,
+            json=payload,
+            headers={"Authorization": f"Bearer {api_key()}"},
+            timeout=timeout,
+        )
+        if resp.status_code not in RETRY_STATUS or wait is None:
+            break
+        await asyncio.sleep(wait)
     if resp.is_error:
         raise ModelError(f"HTTP {resp.status_code}: {resp.text[:300]}")
     return resp.json()
