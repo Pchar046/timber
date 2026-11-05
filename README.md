@@ -54,6 +54,36 @@ Every model call has a demo-mode fallback, so the app runs without a key. Every 
 - Live alerts, episodes per day, and mood during each episode (always an estimate).
 - The nightly summary.
 
+## How Timber connects to your devices
+
+Timber sits in the middle. **Senses** come in from the things you wear and carry, and Timber **acts** through the devices around you. Every device becomes a **tool** that Muse Spark can find and call.
+
+### Senses in: what Timber listens to
+
+| Device | How it connects |
+|---|---|
+| **Smartwatch or heart-rate strap** | Standard **Bluetooth heart-rate service**, read with Web Bluetooth in Chrome or Edge on `/watch`. Works with straps and watches that broadcast heart rate. Readings go to Timber every 2 seconds. |
+| **Any sensor, app or hub** | One web request: `POST /api/devices/ingest` with `{"device": "...", "metric": "heart_rate", "value": 92}`. It understands common names (`hr`, `pulse`, `noise`, `db`, `motion`…) and drops impossible values, such as a strap that lost contact. A phone sound meter, a Raspberry Pi sensor or a Home Assistant automation can all feed it. |
+| **Microphone** | The browser streams 24 kHz audio over a websocket to Timber's server, which relays it to **Muse Voice Transcribe**. Speaker diarization tells your voice from other people's. The API key never leaves the server. |
+| **Phone camera** | A photo plus "Where are my keys?" goes to **SAM 3.1**, which finds the object. The sighting is saved to memory with the photo as its receipt. |
+
+### Hands out: what Timber can act on
+
+| Device | How it connects |
+|---|---|
+| **Smart lights, speakers, thermostats** | Through **Home Assistant**, which supports most smart-home brands. Set `HA_URL`, `HA_TOKEN` and your entity IDs in `.env`. Timber calls Home Assistant's services: `light.turn_on` with a brightness, `media_player.media_pause` and `volume_set`, and `climate.set_temperature`. Without Home Assistant, a simulated home shows the same actions on screen. |
+| **Devices that come and go** | Any device can announce itself with `POST /api/devices/register`: its name, kind, room, the actions it offers, and how long it stays (`ttl_s`). It becomes a Muse Spark tool straight away and disappears when it leaves range. That's how a store's quiet-zone light shows up when you walk in. Timber never carries a fixed device list; the Mind uses **tool search** to find what's nearby right now. |
+| **Your phone** | The `/person` web app stays connected over a websocket. It gives a gentle vibration (Vibration API on Android; a soft on-screen pulse on iPhone), banners, the missing word and Timber's replies, and can speak out loud. |
+| **Your trusted people** | `/circle` gets live alerts over a websocket the moment overload starts, plus the nightly summary. |
+
+**One example, end to end:** your watch's heart rate and the room's noise climb above your baseline.
+1. Timber vibrates your phone and alerts your trusted person.
+2. It searches for nearby calming tools and finds the store's light and music.
+3. Muse Spark calls `set_brightness(percent=30)` and `pause()`.
+4. When you're calm, Timber puts everything back.
+
+**In the demo video**, the watch readings and devices are simulated so the story is repeatable. The Bluetooth reader, the ingest API, device registration and the Home Assistant connection are all real code paths in this repo.
+
 ## Screens
 
 | Page | For |
