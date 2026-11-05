@@ -12,6 +12,8 @@ Built by Patrick Charles for the **Meta Global AI Developer Hackathon** (Indie D
 
 ---
 
+**This is Phase 1 of 5:** the brain. The [roadmap](#roadmap-this-is-phase-1) takes it to real smart devices, private on-device AI, your own voice, and a behind-the-ear wearable.
+
 ## The idea: the Calm-Self Proxy
 
 AI agents usually stop and ask "are you sure?" Timber's person often can't answer at the critical moment. So Timber is built around four things:
@@ -170,6 +172,20 @@ See `.env.example` for all of them.
 
   The console says so on screen.
 - **Placeholders:** "Trusted person" and "Maria" are example names in `data/`.
+
+## Roadmap: this is Phase 1
+
+What's in this repo is **Phase 1: the brain.** It's the software that senses, decides, speaks with proof, remembers and learns with permission, running on five Meta models. A smart-devices prototype is already in the works. With more time, the next four phases are:
+
+| Phase | What it adds | Meta models |
+|---|---|---|
+| **1. The brain** *(built during this hackathon)* | The Mind and its agents, the Calm-Self Contract, proof-carrying speech, devices as tools, memory, the nightly review, Autism and Dementia modes, the apps and console | Muse Spark, Muse Wonder, Voice Transcribe, SAM 3.1, Muse Image |
+| **2. Real smart devices** *(in the works)* | Timber running a real home through Home Assistant (lights, speakers, thermostat) and real wearables all day. Shops, offices and venues can offer a "quiet tool" (a dimmable light, quieter music) that Timber finds as you walk in. | Muse Spark tool calling |
+| **3. Private and offline** | A guardian on a home hub that filters sensitive audio before anything leaves the house, and keeps the core loop working with no internet | Muse Glimmer (open weights, on device) |
+| **4. Your own voice** | Speak-for-me in a voice that sounds like you, from a model tuned on your own phrases, which only you approve | Muse Spark Open (open weights, fine-tuned) |
+| **5. Behind the ear** | The no-touch wearable Timber was designed for: a small device behind the ear with a microphone, gentle haptics and a quiet speaker, so it helps without anyone needing to hold a phone. Pilots with autistic adults, families and care partners. | All of the above |
+
+Every phase keeps the same rules: no medical advice, every fact with a receipt, and nothing changes without the person's calm-self approval.
 
 ## Privacy and safety
 
